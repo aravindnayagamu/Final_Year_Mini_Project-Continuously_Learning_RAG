@@ -22,7 +22,7 @@ logging.basicConfig(
     format="%(asctime)s - %(threadName)s - %(levelname)s - %(message)s"
 )
 
-
+CUR_DIR = Path(__file__).resolve().parent
 PROJECT_DIR = CUR_DIR.parent
 DATA_DIR = CUR_DIR / "news_database" / "unread"
 

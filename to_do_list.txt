@@ -1,0 +1,4 @@
+1. Create a context window to include the previous user interactions
+2. Configure the metadata and cite the sources to the llm
+3. Use of weights if possible for various news articles
+4. Use of long and short term memories for separate memories and later consolidate the results

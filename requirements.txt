@@ -1,0 +1,11 @@
+langchain
+langchain-huggingface
+langchain-chroma
+chromadb
+sentence-transformers
+pypdf
+feedparser
+schedule
+python-dotenv
+google-genai
+reportlab

@@ -7,9 +7,7 @@ import sqlite3
 import hashlib
 from datetime import datetime
 import concurrent.futures
-
 from pathlib import Path
-
 from reportlab.lib.pagesizes import A4
 from reportlab.platypus import (
     SimpleDocTemplate,
@@ -19,49 +17,19 @@ from reportlab.platypus import (
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.enums import TA_LEFT
 from xml.sax.saxutils import escape
-
-
-# ============================================================
-# LOGGING
-# ============================================================
-
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(threadName)s - %(levelname)s - %(message)s"
 )
 
 
-# ============================================================
-# PATHS
-# ============================================================
-
-# Directory containing this Python file
-#
-# .../continuously_learning_rag/app/
-CUR_DIR = Path(__file__).resolve().parent
-
-# Project root
-#
-# .../continuously_learning_rag/
 PROJECT_DIR = CUR_DIR.parent
-
-# Folder where newly fetched PDFs are stored
-#
-# .../continuously_learning_rag/app/news_database/unread/
 DATA_DIR = CUR_DIR / "news_database" / "unread"
 
-# Databases
 TRACKER_DB = PROJECT_DIR / "tracker.db"
 METADATA_DB = PROJECT_DIR / "metadata.db"
-
-
-# Create unread directory if it doesn't exist
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-
-# ============================================================
-# RSS SOURCES
-# ============================================================
 
 RSS_SOURCES = [
     {
@@ -78,10 +46,6 @@ RSS_SOURCES = [
     }
 ]
 
-
-# ============================================================
-# DATABASE INITIALIZATION
-# ============================================================
 
 def init_databases():
 
@@ -102,9 +66,6 @@ def init_databases():
         conn.commit()
 
 
-    # --------------------------------------------------------
-    # Metadata database
-    # --------------------------------------------------------
 
     with sqlite3.connect(METADATA_DB) as conn:
 
@@ -119,22 +80,14 @@ def init_databases():
         """)
 
         conn.commit()
-
-
-# Initialize databases when program starts
 init_databases()
 
-
-# ============================================================
-# CLEAN HTML
-# ============================================================
 
 def clean_html(raw_html):
 
     if not raw_html:
         return ""
 
-    # Remove CDATA wrapper
     clean_text = re.sub(
         r'<!\[CDATA\[(.*?)\]\]>',
         r'\1',
@@ -142,14 +95,12 @@ def clean_html(raw_html):
         flags=re.DOTALL
     )
 
-    # Remove HTML tags
     clean_text = re.sub(
         r'<.*?>',
         '',
         clean_text
     )
 
-    # Normalize whitespace
     clean_text = re.sub(
         r'\s+',
         ' ',
@@ -158,11 +109,6 @@ def clean_html(raw_html):
 
     return clean_text.strip()
 
-
-# ============================================================
-# GENERATE STABLE PAPER ID
-# ============================================================
-
 def generate_paper_id(original_id):
 
     return hashlib.md5(
@@ -170,9 +116,6 @@ def generate_paper_id(original_id):
     ).hexdigest()
 
 
-# ============================================================
-# CHECK WHETHER ARTICLE WAS ALREADY SEEN
-# ============================================================
 
 def is_item_seen(original_id):
 
@@ -192,10 +135,6 @@ def is_item_seen(original_id):
         return cursor.fetchone() is not None
 
 
-# ============================================================
-# SAVE TRACKING + METADATA
-# ============================================================
-
 def mark_item_seen_and_save_metadata(
     original_id,
     paper_id,
@@ -203,12 +142,6 @@ def mark_item_seen_and_save_metadata(
 ):
 
     retrieval_time = datetime.now().isoformat()
-
-
-    # --------------------------------------------------------
-    # Save to tracker database
-    # --------------------------------------------------------
-
     with sqlite3.connect(TRACKER_DB) as conn:
 
         cursor = conn.cursor()
@@ -224,10 +157,6 @@ def mark_item_seen_and_save_metadata(
 
         conn.commit()
 
-
-    # --------------------------------------------------------
-    # Save metadata
-    # --------------------------------------------------------
 
     with sqlite3.connect(METADATA_DB) as conn:
 
@@ -253,9 +182,6 @@ def mark_item_seen_and_save_metadata(
         conn.commit()
 
 
-# ============================================================
-# SAVE ARTICLE AS PDF
-# ============================================================
 
 def save_pdf_file(
     paper_id,
@@ -264,29 +190,16 @@ def save_pdf_file(
     source_name
 ):
 
-    # --------------------------------------------------------
-    # Clean source name for use in filename
-    # --------------------------------------------------------
-
     safe_source = re.sub(
         r'[\\/*?:"<>|]',
         "",
         source_name
     )
 
-
-    # --------------------------------------------------------
-    # PDF path
-    # --------------------------------------------------------
-
     filepath = DATA_DIR / f"{safe_source}_{paper_id}.pdf"
 
 
     try:
-
-        # ----------------------------------------------------
-        # Create PDF document
-        # ----------------------------------------------------
 
         doc = SimpleDocTemplate(
             str(filepath),
@@ -297,22 +210,12 @@ def save_pdf_file(
             bottomMargin=40
         )
 
-
-        # ----------------------------------------------------
-        # Styles
-        # ----------------------------------------------------
-
         styles = getSampleStyleSheet()
 
         title_style = styles["Title"]
         body_style = styles["BodyText"]
 
         title_style.alignment = TA_LEFT
-
-
-        # ----------------------------------------------------
-        # PDF content
-        # ----------------------------------------------------
 
         story = []
 
@@ -342,16 +245,9 @@ def save_pdf_file(
             Spacer(1, 10)
         )
 
-
-        # Article content
-        #
-        # Escape special HTML characters because ReportLab's
-        # Paragraph interprets text as XML/HTML.
-        #
         escaped_content = escape(content)
 
 
-        # Convert newlines into paragraph breaks
         paragraphs = escaped_content.split("\n")
 
 
@@ -374,10 +270,6 @@ def save_pdf_file(
             )
 
 
-        # ----------------------------------------------------
-        # Generate the actual PDF
-        # ----------------------------------------------------
-
         doc.build(story)
 
 
@@ -396,7 +288,6 @@ def save_pdf_file(
             f"Failed to save PDF {filepath.name}: {e}"
         )
 
-        # If a partially-created PDF exists, remove it
         if filepath.exists():
 
             try:
@@ -408,10 +299,6 @@ def save_pdf_file(
         return False
 
 
-# ============================================================
-# PROCESS ONE RSS FEED
-# ============================================================
-
 def process_rss_feed(source_config):
 
     source_name = source_config["source_name"]
@@ -422,10 +309,6 @@ def process_rss_feed(source_config):
         f"[{source_name}] Starting RSS fetch..."
     )
 
-
-    # --------------------------------------------------------
-    # Parse RSS feed
-    # --------------------------------------------------------
 
     try:
 
@@ -440,11 +323,6 @@ def process_rss_feed(source_config):
 
         return
 
-
-    # --------------------------------------------------------
-    # Check whether feed contains articles
-    # --------------------------------------------------------
-
     if not parsed_feed.entries:
 
         logging.warning(
@@ -456,18 +334,7 @@ def process_rss_feed(source_config):
 
 
     new_items_count = 0
-
-
-    # --------------------------------------------------------
-    # Process every RSS entry
-    # --------------------------------------------------------
-
     for entry in parsed_feed.entries:
-
-
-        # ----------------------------------------------------
-        # Get unique article identifier
-        # ----------------------------------------------------
 
         original_id = getattr(
             entry,
@@ -485,11 +352,6 @@ def process_rss_feed(source_config):
 
             continue
 
-
-        # ----------------------------------------------------
-        # Check duplicate
-        # ----------------------------------------------------
-
         if is_item_seen(original_id):
 
             logging.info(
@@ -500,22 +362,11 @@ def process_rss_feed(source_config):
 
             break
 
-
-        # ----------------------------------------------------
-        # Extract title
-        # ----------------------------------------------------
-
         title = getattr(
             entry,
             "title",
             "No Title"
         )
-
-
-        # ----------------------------------------------------
-        # Extract RSS description
-        # ----------------------------------------------------
-
         description = clean_html(
             getattr(
                 entry,
@@ -524,20 +375,9 @@ def process_rss_feed(source_config):
             )
         )
 
-
-        # ----------------------------------------------------
-        # Generate stable paper ID
-        # ----------------------------------------------------
-
         paper_id = generate_paper_id(
             original_id
         )
-
-
-        # ----------------------------------------------------
-        # Create PDF
-        # ----------------------------------------------------
-
         saved = save_pdf_file(
             paper_id,
             title,
@@ -546,10 +386,6 @@ def process_rss_feed(source_config):
         )
 
 
-        # ----------------------------------------------------
-        # Only mark article as seen AFTER successful PDF
-        # creation.
-        # ----------------------------------------------------
 
         if saved:
 
@@ -569,10 +405,6 @@ def process_rss_feed(source_config):
     )
 
 
-# ============================================================
-# RUN ALL RSS SCRAPERS
-# ============================================================
-
 def run_all_scrapers():
 
     logging.info(
@@ -583,10 +415,7 @@ def run_all_scrapers():
     )
 
 
-    # --------------------------------------------------------
-    # Create one worker per RSS source
-    # --------------------------------------------------------
-
+    
     with concurrent.futures.ThreadPoolExecutor(
         max_workers=len(RSS_SOURCES)
     ) as executor:
@@ -595,7 +424,6 @@ def run_all_scrapers():
         futures = []
 
 
-        # Submit all RSS sources concurrently
         for source in RSS_SOURCES:
 
             future = executor.submit(
@@ -605,10 +433,6 @@ def run_all_scrapers():
 
             futures.append(future)
 
-
-        # ----------------------------------------------------
-        # Wait for all threads to finish
-        # ----------------------------------------------------
 
         for future in futures:
 
@@ -630,9 +454,6 @@ def run_all_scrapers():
     )
 
 
-# ============================================================
-# MAIN PROGRAM
-# ============================================================
 
 if __name__ == "__main__":
 
@@ -640,17 +461,7 @@ if __name__ == "__main__":
         "News fetcher started."
     )
 
-
-    # --------------------------------------------------------
-    # 1. FETCH IMMEDIATELY
-    # --------------------------------------------------------
-
     run_all_scrapers()
-
-
-    # --------------------------------------------------------
-    # 2. SCHEDULE NEXT FETCH
-    # --------------------------------------------------------
 
     schedule.every(20).minutes.do(
         run_all_scrapers
@@ -666,10 +477,7 @@ if __name__ == "__main__":
     )
 
 
-    # --------------------------------------------------------
-    # 3. KEEP PROGRAM ALIVE
-    # --------------------------------------------------------
-
+    
     try:
 
         while True:

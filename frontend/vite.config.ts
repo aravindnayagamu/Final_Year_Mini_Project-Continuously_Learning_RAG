@@ -17,7 +17,11 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
         configure: (proxy) => {
-          proxy.on("error", (err, _req, res) => {
+          proxy.on("proxyReq", (proxyReq) => {
+            proxyReq.setHeader("Connection", "close");
+          });
+          proxy.removeAllListeners("error");
+          proxy.on("error", (_err, _req, res) => {
             if (res && "writeHead" in res && !res.headersSent) {
               res.writeHead(502, { "Content-Type": "application/json" });
               res.end(JSON.stringify({ error: "Backend unavailable" }));

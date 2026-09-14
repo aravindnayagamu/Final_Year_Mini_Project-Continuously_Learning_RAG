@@ -22,3 +22,4 @@ langchain-community
 langchain-huggingface
 langchain-chroma
 langchain-text-splitters
+python-multipart

@@ -1,5 +1,7 @@
 fastapi
 uvicorn[standard]
+requests
+urllib3
 sqlalchemy[asyncio]
 asyncpg
 psycopg2-binary
@@ -23,3 +25,6 @@ langchain-huggingface
 langchain-chroma
 langchain-text-splitters
 python-multipart
+redis
+celery
+slowapi

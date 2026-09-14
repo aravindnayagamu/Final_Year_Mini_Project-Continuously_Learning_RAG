@@ -80,9 +80,7 @@ def embedded_text(chunks):
 
     for chunk in chunks:
         text = str(chunk.page_content)
-        # Remove problematic Unicode surrogate characters
         text = text.encode("utf-8", errors="ignore").decode("utf-8")
-
         if not text.strip():
             continue
 

@@ -73,7 +73,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-PREFIX = "/api/"
+PREFIX = "/api/v1"
 app.include_router(health.router, prefix=PREFIX)
 app.include_router(query.router, prefix=PREFIX)
 app.include_router(documents.router, prefix=PREFIX)

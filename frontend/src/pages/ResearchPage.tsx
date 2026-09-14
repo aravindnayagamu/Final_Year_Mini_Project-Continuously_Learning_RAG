@@ -138,10 +138,20 @@ export default function ResearchPage() {
           prev.map((m) => (m.id === loadingMsg.id ? assistantMsg : m))
         );
       } catch (err: unknown) {
-        const errMsg =
-          err instanceof Error
-            ? err.message
-            : "An error occurred querying the research assistant.";
+        let errMsg = "An error occurred querying the research assistant.";
+        if (err && typeof err === "object") {
+          const axiosErr = err as {
+            response?: { data?: { error?: string; detail?: string } };
+            message?: string;
+          };
+          errMsg =
+            axiosErr.response?.data?.error ||
+            axiosErr.response?.data?.detail ||
+            axiosErr.message ||
+            errMsg;
+        } else if (err instanceof Error) {
+          errMsg = err.message;
+        }
         setMessages((prev) =>
           prev.map((m) =>
             m.id === loadingMsg.id

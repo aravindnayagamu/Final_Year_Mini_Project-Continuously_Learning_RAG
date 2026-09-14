@@ -12,7 +12,7 @@ settings = get_settings()
 
 
 @router.post("/query", response_model=QueryResponse, tags=["RAG"])
-@limiter.limit(settings.query_rate_limit)
+@limiter.limit(lambda: get_settings().query_rate_limit)
 async def query(request: Request, payload: QueryRequest = Body(...)) -> QueryResponse:
     logger.info("POST /query | question=%r k=%d", payload.question[:80], payload.k)
     try:

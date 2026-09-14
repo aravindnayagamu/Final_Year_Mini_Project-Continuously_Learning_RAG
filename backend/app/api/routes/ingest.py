@@ -19,7 +19,7 @@ _ingestion_lock = asyncio.Lock()
 
 
 @router.post("/ingest", response_model=IngestResponse, tags=["Ingestion"])
-@limiter.limit(settings.ingest_rate_limit)
+@limiter.limit(lambda: get_settings().ingest_rate_limit)
 async def trigger_ingestion(
     request: Request,
     background_tasks: BackgroundTasks,

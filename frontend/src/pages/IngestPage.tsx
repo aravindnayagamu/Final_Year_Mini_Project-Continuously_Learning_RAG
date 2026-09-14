@@ -63,9 +63,7 @@ export default function IngestPage() {
       />
 
       <div className="page-body">
-        {/* Trigger card */}
         <div className="ingest-trigger-card">
-          {/* <div className="ingest-icon-wrap"></div> */}
           <div className="ingest-info">
             <h2>Manual Ingestion</h2>
             <p>

@@ -49,7 +49,7 @@ async def list_research_papers() -> List[ResearchPaperOut]:
 
 
 @router.post("/query", response_model=ResearchQueryResponse)
-@limiter.limit(settings.query_rate_limit)
+@limiter.limit(lambda: get_settings().query_rate_limit)
 async def query_research_assistant(
     request: Request,
     payload: ResearchQueryRequest = Body(...),

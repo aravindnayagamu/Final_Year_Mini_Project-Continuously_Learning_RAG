@@ -189,15 +189,9 @@ def save_pdf_file(paper_id,title,content,source_name):
         title_style.alignment = TA_LEFT
 
         story = []
-
-        # Title
         story.append(Paragraph(escape(title),title_style))
-
         story.append(Spacer(1, 15))
-
-        # Source
         story.append(Paragraph(f"<b>Source:</b> {escape(source_name)}",body_style))
-
         story.append(Spacer(1, 10))
 
         escaped_content = escape(content)

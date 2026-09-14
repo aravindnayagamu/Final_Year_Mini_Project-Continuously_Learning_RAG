@@ -31,7 +31,6 @@ def main():
     results, relevant_results, context, retrieval_time = (
         retrieve_documents(question, k=5)
     )
-    #print("The prompt is formulated")
     if not context:
         print("No relevant information found.")
         return

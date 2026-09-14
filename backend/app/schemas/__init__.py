@@ -1,4 +1,3 @@
-# backend/schemas package
 from app.schemas.query import QueryRequest, QueryResponse, SourceChunk
 from app.schemas.document import DocumentOut, DocumentStats
 from app.schemas.ingest import IngestResponse, IngestionRunOut

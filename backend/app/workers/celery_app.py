@@ -22,6 +22,13 @@ conf_updates = {
     "enable_utc": True,
     "task_track_started": True,
     "task_time_limit": 600,
+    "beat_schedule": {
+        "periodic-news-ingestion": {
+            "task": "app.workers.tasks.ingest_news_task",
+            "schedule": float(settings.fetch_interval_minutes * 60),
+            "args": ("scheduler",),
+        },
+    },
 }
 
 if is_ssl:

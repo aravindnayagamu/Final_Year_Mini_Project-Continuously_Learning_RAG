@@ -1,9 +1,7 @@
-from __future__ import annotations
-
 import logging
 from typing import List
 
-from fastapi import APIRouter, File, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Body, File, HTTPException, Request, UploadFile
 
 from app.core.config import get_settings
 from app.core.limiter import limiter
@@ -54,7 +52,7 @@ async def list_research_papers() -> List[ResearchPaperOut]:
 @limiter.limit(settings.query_rate_limit)
 async def query_research_assistant(
     request: Request,
-    payload: ResearchQueryRequest,
+    payload: ResearchQueryRequest = Body(...),
 ) -> ResearchQueryResponse:
     try:
         return await research_service.query_research(

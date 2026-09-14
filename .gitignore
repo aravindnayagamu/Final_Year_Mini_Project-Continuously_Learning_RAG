@@ -4,6 +4,10 @@
 *.env
 *.bin
 
+backend/app/news_database/
+backend/app/vector_db/
+backend/app/research_database/
+
 node_modules/
 dist/
 dist-ssr/

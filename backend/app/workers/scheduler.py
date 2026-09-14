@@ -59,7 +59,10 @@ async def _check_and_run_if_due() -> None:
                 last_run = runs[0]
                 if last_run.started_at:
                     now = datetime.now(timezone.utc)
-                    elapsed_min = (now - last_run.started_at).total_seconds() / 60.0
+                    last_started = last_run.started_at
+                    if last_started.tzinfo is None:
+                        last_started = last_started.replace(tzinfo=timezone.utc)
+                    elapsed_min = (now - last_started).total_seconds() / 60.0
                     if elapsed_min >= settings.fetch_interval_minutes:
                         should_run = True
             if should_run:

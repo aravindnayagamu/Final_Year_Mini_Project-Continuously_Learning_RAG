@@ -27,10 +27,26 @@ class Settings(BaseSettings):
     )
 
     database_url: str = ""
+    sqlite_db_url: str = ""
     gemini_api_key: str = ""
     gemini_model: str = ""
 
     app_dir: Path = Path(__file__).resolve().parents[1]
+
+    @property
+    def chroma_db_path(self) -> Path:
+        if self.sqlite_db_url and self.sqlite_db_url.startswith("sqlite:///"):
+            raw_path = self.sqlite_db_url.replace("sqlite:///", "")
+            p = Path(raw_path)
+            if not p.is_absolute():
+                backend_dir = Path(__file__).resolve().parents[2]
+                return (backend_dir / p).resolve()
+            return p
+        return self.app_dir / "vector_db" / "chroma.sqlite3"
+
+    @property
+    def chroma_dir(self) -> Path:
+        return self.chroma_db_path.parent
 
     @field_validator("app_dir", mode="before")
     @classmethod

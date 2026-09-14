@@ -28,7 +28,7 @@ async def health_check() -> dict:
         health["status"] = "degraded"
         logger.warning("Postgres health check failed: %s", exc)
 
-    chroma_db = settings.app_dir / "vector_db" / "chroma.sqlite3"
+    chroma_db = settings.chroma_db_path
     health["services"]["chromadb"] = "ok" if chroma_db.exists() else "not found"
     logger.debug("ChromaDB health: %s", health["services"]["chromadb"])
 

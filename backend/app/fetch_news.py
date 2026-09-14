@@ -1,5 +1,6 @@
 import time
 import logging
+import urllib.request
 import feedparser
 import schedule
 import re
@@ -244,11 +245,16 @@ def process_rss_feed(source_config):
     logging.info(f"[{source_name}] Starting RSS fetch...")
 
     try:
-        parsed_feed = feedparser.parse(url)
-
-    except Exception as e:
-        logging.error(f"[{source_name}] " f"Error parsing feed: {e}")
-        return
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            content = resp.read().decode("utf-8-sig", errors="ignore")
+        parsed_feed = feedparser.parse(content)
+    except Exception:
+        try:
+            parsed_feed = feedparser.parse(url)
+        except Exception as e:
+            logging.error(f"[{source_name}] " f"Error parsing feed: {e}")
+            return
 
     if not parsed_feed.entries:
         logging.warning(f"[{source_name}] " f"No entries found.")

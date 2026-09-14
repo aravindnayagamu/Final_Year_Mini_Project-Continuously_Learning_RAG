@@ -1,10 +1,19 @@
+import os
 from pathlib import Path
 import time
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 
 cur_dir = Path(__file__).resolve().parent
-db_dir = cur_dir / "vector_db"
+sqlite_url = os.getenv("SQLITE_DB_URL", "")
+if sqlite_url.startswith("sqlite:///"):
+    raw_path = sqlite_url.replace("sqlite:///", "")
+    p = Path(raw_path)
+    if not p.is_absolute():
+        p = (cur_dir.parent / p).resolve()
+    db_dir = p.parent
+else:
+    db_dir = cur_dir / "vector_db"
 embedding_model = HuggingFaceEmbeddings(
     model_name="sentence-transformers/all-MiniLM-L6-v2"
 )

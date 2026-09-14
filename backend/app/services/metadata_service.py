@@ -4,7 +4,7 @@ import logging
 from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 
-from sqlalchemy import func, select, update
+from sqlalchemy import case, func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -39,12 +39,15 @@ async def upsert_document(
         index_elements=["paper_id"],
         set_={
             "source_name": stmt.excluded.source_name,
-            "title": stmt.excluded.title,
-            "retrieval_time": stmt.excluded.retrieval_time,
-            "file_name": stmt.excluded.file_name,
-            "vectorization_status": stmt.excluded.vectorization_status,
-            "chunk_count": stmt.excluded.chunk_count,
-            "vectorized_at": stmt.excluded.vectorized_at,
+            "title": func.coalesce(stmt.excluded.title, Document.title),
+            "retrieval_time": func.coalesce(stmt.excluded.retrieval_time, Document.retrieval_time),
+            "file_name": func.coalesce(stmt.excluded.file_name, Document.file_name),
+            "vectorization_status": case(
+                (Document.vectorization_status == "vectorized", "vectorized"),
+                else_=stmt.excluded.vectorization_status,
+            ),
+            "chunk_count": func.coalesce(stmt.excluded.chunk_count, Document.chunk_count),
+            "vectorized_at": func.coalesce(stmt.excluded.vectorized_at, Document.vectorized_at),
         },
     )
     await db.execute(stmt)

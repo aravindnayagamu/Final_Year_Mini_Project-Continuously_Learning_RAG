@@ -107,6 +107,7 @@ async def run_ingestion(triggered_by: str = "manual") -> int:
         logger.info("Ingestion #%d | Step 2: Syncing SQLite → Postgres", run_id)
         sqlite_path = settings.app_dir.parent / "metadata.db"
         all_rows = _read_new_sqlite_rows(sqlite_path)
+        read_dir = settings.app_dir / "news_database" / "read"
 
         async with AsyncSessionLocal() as db:
             for row in all_rows:
@@ -116,13 +117,17 @@ async def run_ingestion(triggered_by: str = "manual") -> int:
                     rt = None
                 safe_source = row["source_name"].replace("/", "").replace("\\", "")
                 pdf_name = f"{safe_source}_{row['paper_id']}.pdf"
+                is_read = (read_dir / pdf_name).exists()
+                status_val = "vectorized" if is_read else "pending"
+                vectorized_at_val = datetime.now(timezone.utc) if is_read else None
                 await metadata_service.upsert_document(
                     db=db,
                     paper_id=row["paper_id"],
                     source_name=row["source_name"],
                     retrieval_time=rt,
                     file_name=pdf_name,
-                    vectorization_status="pending",
+                    vectorization_status=status_val,
+                    vectorized_at=vectorized_at_val,
                 )
             await db.commit()
 
@@ -132,20 +137,18 @@ async def run_ingestion(triggered_by: str = "manual") -> int:
         logger.info("Ingestion #%d | Step 3: Running vectorizer", run_id)
         articles_vectorized = await loop.run_in_executor(None, _run_vectorizer)
 
-        if articles_vectorized > 0:
-            async with AsyncSessionLocal() as db:
-                from sqlalchemy import update
+        async with AsyncSessionLocal() as db:
+            from sqlalchemy import select
+            pending_docs = (
                 await db.execute(
-                    update(Document)
-                    .where(Document.vectorization_status == "pending")
-                    .values(
-                        vectorization_status="vectorized",
-                        vectorized_at=datetime.now(timezone.utc),
-                    )
+                    select(Document).where(Document.vectorization_status == "pending")
                 )
-                await db.commit()
-            logger.info("Ingestion #%d | Marked %d pending docs as vectorized",
-                        run_id, articles_vectorized)
+            ).scalars().all()
+            for doc in pending_docs:
+                if doc.file_name and (read_dir / doc.file_name).exists():
+                    doc.vectorization_status = "vectorized"
+                    doc.vectorized_at = datetime.now(timezone.utc)
+            await db.commit()
 
         status = RunStatus.completed.value
 

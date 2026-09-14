@@ -7,13 +7,24 @@ from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 
+cur_dir = Path(__file__).resolve().parent
+base_dir = cur_dir.parent
 
-cur_dir=Path(__file__)
-#print(cur_dir)
-base_dir=cur_dir.resolve().parent.parent
-unread_dir=base_dir/'app'/'news_database'/'unread'
-read_dir=base_dir/'app'/'news_database'/'read'
-db_dir = base_dir / 'app' / 'vector_db'
+sqlite_url = os.getenv("SQLITE_DB_URL", "")
+if sqlite_url.startswith("sqlite:///"):
+    raw_path = sqlite_url.replace("sqlite:///", "")
+    p = Path(raw_path)
+    if not p.is_absolute():
+        p = (base_dir / p).resolve()
+    db_dir = p.parent
+else:
+    db_dir = base_dir / "app" / "vector_db"
+
+unread_dir = base_dir / "app" / "news_database" / "unread"
+read_dir = base_dir / "app" / "news_database" / "read"
+
+unread_dir.mkdir(parents=True, exist_ok=True)
+read_dir.mkdir(parents=True, exist_ok=True)
 db_dir.mkdir(parents=True, exist_ok=True)
 
 embedding_model = HuggingFaceEmbeddings(
@@ -25,15 +36,13 @@ vector_store = Chroma(
     persist_directory=str(db_dir)
 )
 
-
-
 def extract_text(path):
-    reader=PdfReader(path)
-    full_text=""
+    reader = PdfReader(path)
+    full_text = ""
     for pages in reader.pages:
-        text=pages.extract_text()
+        text = pages.extract_text()
         if text:
-            full_text+=text+"\n"
+            full_text += text + "\n"
     return full_text
 
 def chunk_text(text, file_name):
@@ -42,45 +51,27 @@ def chunk_text(text, file_name):
         return []
     
     text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=2000, chunk_overlap=300, add_start_index=True
+        chunk_size=1000, chunk_overlap=200, add_start_index=True
     )
-    doc = Document(page_content=text, metadata={"source": file_name})
+    doc = Document(page_content=text, metadata={"source": file_name, "doc_type": "news"})
     all_splits = text_splitter.split_documents([doc])
     cleaned_splits = []
     for chunk in all_splits:
         if chunk.page_content and chunk.page_content.strip():
             chunk.page_content = chunk.page_content.strip()
             cleaned_splits.append(chunk)
-    #print(f"The type of the chunk after splitting is {type(cleaned_splits[0])}")
     return cleaned_splits
-
-def process_unread_files():
-    for file in unread_dir.iterdir():
-        
-        if file.suffix.lower()=='.pdf':
-            text=extract_text(file)
-            #print(f"Read {file.name} with {len(text)} characters")
-            #print(text[:1000])
-            text_chunk=chunk_text(text,file.name)
-            #print(type(text_chunk))
-            text_embedded=embedded_text(text_chunk)
-            dest=read_dir/file.name
-            shutil.move(file,dest)
-            
-    return 
-    
 
 def embedded_text(chunks):
     if not chunks:
         print("No valid chunks to embed.")
-        return
+        return 0
 
     texts = []
     metadatas = []
 
     for chunk in chunks:
         text = str(chunk.page_content)
-        # Remove problematic Unicode surrogate characters
         text = text.encode("utf-8", errors="ignore").decode("utf-8")
 
         if not text.strip():
@@ -91,12 +82,30 @@ def embedded_text(chunks):
 
     if not texts:
         print("No valid text to embed.")
-        return
+        return 0
 
     vector_store.add_texts(
         texts=texts,
         metadatas=metadatas
     )
     print(f"Embedded {len(texts)} chunks.")
+    return len(texts)
 
-process_unread_files()
+def process_unread_files():
+    unread_dir.mkdir(parents=True, exist_ok=True)
+    read_dir.mkdir(parents=True, exist_ok=True)
+    processed_count = 0
+    for file in unread_dir.iterdir():
+        if file.suffix.lower() == ".pdf":
+            text = extract_text(file)
+            text_chunk = chunk_text(text, file.name)
+            embedded_text(text_chunk)
+            dest = read_dir / file.name
+            if dest.exists():
+                dest.unlink()
+            shutil.move(file, dest)
+            processed_count += 1
+    return processed_count
+
+if __name__ == "__main__":
+    process_unread_files()

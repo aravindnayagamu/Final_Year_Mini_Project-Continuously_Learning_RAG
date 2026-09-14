@@ -18,7 +18,7 @@ from app.core.config import get_settings
 from app.core.logging import setup_logging
 from app.db.models import Base
 from app.db.session import engine
-from app.api.routes import health, query, documents, ingest
+from app.api.routes import health, query, documents, ingest, research
 from app.workers import scheduler
 
 setup_logging()
@@ -68,5 +68,6 @@ app.include_router(health.router, prefix=PREFIX)
 app.include_router(query.router, prefix=PREFIX)
 app.include_router(documents.router, prefix=PREFIX)
 app.include_router(ingest.router, prefix=PREFIX)
+app.include_router(research.router, prefix=PREFIX)
 
 logger.debug("All routers registered under %s", PREFIX)

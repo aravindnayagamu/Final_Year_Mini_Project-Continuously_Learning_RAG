@@ -22,7 +22,7 @@ from app.schemas.research import (
     ResearchQueryResponse,
     ResearchUploadResponse,
 )
-from app.services import metadata_service
+from app.services import cache_service, metadata_service
 from app.services.rag_service import _get_gemini_client
 from app.retrive import vector_store
 
@@ -151,6 +151,20 @@ async def query_research(
     paper_id: Optional[str] = None,
     k: int = 5,
 ) -> ResearchQueryResponse:
+    cache_key = cache_service.build_cache_key("research_query", paper_id or "all", question, k)
+    cached = await cache_service.get_cached_json(cache_key)
+    if cached:
+        logger.info("Cache hit for research query=%r paper_id=%s", question[:80], paper_id)
+        return ResearchQueryResponse(
+            question=cached["question"],
+            answer=cached["answer"],
+            sources=[SourceChunk(**s) for s in cached["sources"]],
+            retrieval_time_ms=float(cached["retrieval_time_ms"]),
+            context_chunks=int(cached["context_chunks"]),
+            model_used=cached["model_used"] + " (cached)",
+            created_at=datetime.now(timezone.utc).isoformat(),
+        )
+
     t0 = time.perf_counter()
     where_filter = {"paper_id": paper_id} if paper_id else {"doc_type": "research_paper"}
 
@@ -229,6 +243,19 @@ async def query_research(
             await db.commit()
     except Exception as exc:
         logger.error("Failed to log research query to db: %s", exc)
+
+    await cache_service.set_cached_json(
+        cache_key,
+        {
+            "question": question,
+            "answer": answer,
+            "sources": [s.model_dump() for s in sources],
+            "retrieval_time_ms": retrieval_time_ms,
+            "context_chunks": len(sources),
+            "model_used": settings.gemini_model,
+        },
+        ttl_seconds=settings.cache_ttl_seconds,
+    )
 
     return ResearchQueryResponse(
         question=question,

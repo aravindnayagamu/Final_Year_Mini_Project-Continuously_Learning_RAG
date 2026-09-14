@@ -28,8 +28,12 @@ class Settings(BaseSettings):
 
     database_url: str = ""
     sqlite_db_url: str = ""
+    redis_url: str = ""
     gemini_api_key: str = ""
     gemini_model: str = ""
+    query_rate_limit: str = "20/minute"
+    ingest_rate_limit: str = "5/minute"
+    cache_ttl_seconds: int = 3600
 
     app_dir: Path = Path(__file__).resolve().parents[1]
 

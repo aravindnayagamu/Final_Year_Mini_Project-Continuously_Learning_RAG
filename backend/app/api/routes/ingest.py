@@ -4,21 +4,28 @@ import asyncio
 import logging
 from typing import List
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
+from app.core.limiter import limiter
 from app.db.session import get_db
 from app.schemas.ingest import IngestResponse, IngestionRunOut
 from app.services import ingest_service, metadata_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+settings = get_settings()
 
 _ingestion_lock = asyncio.Lock()
 
 
 @router.post("/ingest", response_model=IngestResponse, tags=["Ingestion"])
-async def trigger_ingestion(background_tasks: BackgroundTasks) -> IngestResponse:
+@limiter.limit(settings.ingest_rate_limit)
+async def trigger_ingestion(
+    request: Request,
+    background_tasks: BackgroundTasks,
+) -> IngestResponse:
     logger.info("POST /ingest | manual trigger requested")
     if _ingestion_lock.locked():
         logger.warning("POST /ingest | rejected — ingestion already running")
@@ -26,6 +33,19 @@ async def trigger_ingestion(background_tasks: BackgroundTasks) -> IngestResponse
             status_code=409,
             detail="An ingestion job is already running. Please wait.",
         )
+
+    if settings.redis_url:
+        try:
+            from app.workers.tasks import ingest_news_task
+            task = ingest_news_task.delay(triggered_by="manual")
+            logger.info("Ingestion dispatched to Celery task %s", task.id)
+            return IngestResponse(
+                run_id=-1,
+                status="started",
+                message=f"Ingestion job queued via Celery (task {task.id}).",
+            )
+        except Exception as exc:
+            logger.warning("Failed to dispatch Celery task, falling back to background task: %s", exc)
 
     async def _run() -> None:
         async with _ingestion_lock:

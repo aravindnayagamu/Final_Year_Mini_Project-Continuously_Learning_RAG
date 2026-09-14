@@ -1,22 +1,26 @@
 from __future__ import annotations
 
 import logging
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
+from app.core.config import get_settings
+from app.core.limiter import limiter
 from app.schemas.query import QueryRequest, QueryResponse
 from app.services import rag_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+settings = get_settings()
 
 
 @router.post("/query", response_model=QueryResponse, tags=["RAG"])
-async def query(request: QueryRequest) -> QueryResponse:
-    logger.info("POST /query | question=%r k=%d", request.question[:80], request.k)
+@limiter.limit(settings.query_rate_limit)
+async def query(request: Request, payload: QueryRequest) -> QueryResponse:
+    logger.info("POST /query | question=%r k=%d", payload.question[:80], payload.k)
     try:
         result = await rag_service.answer_question(
-            question=request.question,
-            k=request.k,
+            question=payload.question,
+            k=payload.k,
         )
         logger.info("POST /query | answered | chunks=%d", result.context_chunks)
         return result

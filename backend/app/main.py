@@ -13,9 +13,14 @@ from typing import AsyncGenerator
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from app.core.config import get_settings
 from app.core.logging import setup_logging
+from app.core.limiter import limiter
+from app.core.redis import close_redis
 from app.db.models import Base
 from app.db.session import engine
 from app.api.routes import health, query, documents, ingest, research
@@ -44,6 +49,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     logger.info("Shutting down Continual RAG API")
     scheduler.stop()
+    await close_redis()
     await engine.dispose()
     logger.info("DB engine disposed — shutdown complete")
 
@@ -55,6 +61,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.backend_cors_origins,
@@ -63,7 +73,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-PREFIX = "/api/v1"
+PREFIX = "/api/"
 app.include_router(health.router, prefix=PREFIX)
 app.include_router(query.router, prefix=PREFIX)
 app.include_router(documents.router, prefix=PREFIX)

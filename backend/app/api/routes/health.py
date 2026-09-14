@@ -37,4 +37,9 @@ async def health_check() -> dict:
     )
     logger.debug("Gemini API key: %s", health["services"]["gemini_api"])
 
+    from app.core.redis import ping_redis
+    redis_ok = await ping_redis()
+    health["services"]["redis"] = "ok" if redis_ok else ("not configured" if not settings.redis_url else "unreachable")
+    health["services"]["celery"] = "configured" if settings.redis_url else "not configured"
+
     return health

@@ -11,7 +11,7 @@ from google import genai
 from app.core.config import get_settings
 from app.db.session import AsyncSessionLocal
 from app.schemas.query import QueryResponse, SourceChunk
-from app.services import metadata_service
+from app.services import cache_service, metadata_service
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -46,6 +46,20 @@ async def answer_question(question: str, k: int = 5) -> QueryResponse:
         raise RuntimeError(
             "RAG modules could not be imported. "
             "Verify APP_DIR points to the correct app directory."
+        )
+
+    cache_key = cache_service.build_cache_key("rag_query", question, k)
+    cached = await cache_service.get_cached_json(cache_key)
+    if cached:
+        logger.info("Cache hit for question=%r", question[:80])
+        return QueryResponse(
+            question=cached["question"],
+            answer=cached["answer"],
+            sources=[SourceChunk(**s) for s in cached["sources"]],
+            retrieval_time_ms=float(cached["retrieval_time_ms"]),
+            context_chunks=int(cached["context_chunks"]),
+            model_used=cached["model_used"] + " (cached)",
+            created_at=datetime.now(timezone.utc),
         )
 
     logger.info("RAG query started | question=%r k=%d", question[:80], k)
@@ -105,6 +119,19 @@ async def answer_question(question: str, k: int = 5) -> QueryResponse:
         logger.error("Failed to persist query log to Postgres: %s", exc)
 
     logger.info("RAG query complete | total_ms=%.1f", total_ms)
+
+    await cache_service.set_cached_json(
+        cache_key,
+        {
+            "question": question,
+            "answer": answer,
+            "sources": [s.model_dump() for s in sources],
+            "retrieval_time_ms": retrieval_time_ms,
+            "context_chunks": len(relevant_docs),
+            "model_used": settings.gemini_model,
+        },
+        ttl_seconds=settings.cache_ttl_seconds,
+    )
 
     return QueryResponse(
         question=question,

@@ -3,8 +3,10 @@ from __future__ import annotations
 import logging
 from typing import List
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 
+from app.core.config import get_settings
+from app.core.limiter import limiter
 from app.schemas.research import (
     ResearchPaperOut,
     ResearchQueryRequest,
@@ -15,6 +17,7 @@ from app.services import research_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/research", tags=["Research Assistant"])
+settings = get_settings()
 
 
 @router.post("/upload", response_model=ResearchUploadResponse)
@@ -48,14 +51,16 @@ async def list_research_papers() -> List[ResearchPaperOut]:
 
 
 @router.post("/query", response_model=ResearchQueryResponse)
+@limiter.limit(settings.query_rate_limit)
 async def query_research_assistant(
-    request: ResearchQueryRequest,
+    request: Request,
+    payload: ResearchQueryRequest,
 ) -> ResearchQueryResponse:
     try:
         return await research_service.query_research(
-            question=request.question,
-            paper_id=request.paper_id,
-            k=request.k,
+            question=payload.question,
+            paper_id=payload.paper_id,
+            k=payload.k,
         )
     except Exception as exc:
         logger.exception("Research query failed: %s", exc)

@@ -37,6 +37,7 @@ export interface DocumentStats {
   vectorized: number;
   pending: number;
   failed: number;
+  by_source: Record<string, number>;
 }
 
 export interface IngestResponse {
@@ -77,4 +78,36 @@ export interface ChatMessage {
   model_used?: string;
   created_at: string;
   loading?: boolean;
+}
+
+export interface ResearchPaper {
+  paper_id: string;
+  file_name: string;
+  title: string | null;
+  chunk_count: number | null;
+  vectorization_status: string;
+  created_at: string;
+}
+
+export interface ResearchUploadResponse {
+  paper_id: string;
+  file_name: string;
+  chunk_count: number;
+  message: string;
+}
+
+export interface ResearchQueryRequest {
+  question: string;
+  paper_id?: string | null;
+  k?: number;
+}
+
+export interface ResearchQueryResponse {
+  question: string;
+  answer: string;
+  sources: SourceChunk[];
+  retrieval_time_ms: number;
+  context_chunks: number;
+  model_used: string | null;
+  created_at: string;
 }

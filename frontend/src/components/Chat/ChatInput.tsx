@@ -3,9 +3,10 @@ import { useRef, useState } from "react";
 interface Props {
   onSend: (question: string) => void;
   loading: boolean;
+  placeholder?: string;
 }
 
-export default function ChatInput({ onSend, loading }: Props) {
+export default function ChatInput({ onSend, loading, placeholder }: Props) {
   const [text, setText] = useState("");
   const ref = useRef<HTMLTextAreaElement>(null);
 
@@ -28,7 +29,6 @@ export default function ChatInput({ onSend, loading }: Props) {
 
   const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setText(e.target.value);
-    // Auto-grow textarea
     if (ref.current) {
       ref.current.style.height = "auto";
       ref.current.style.height = `${ref.current.scrollHeight}px`;
@@ -41,7 +41,7 @@ export default function ChatInput({ onSend, loading }: Props) {
         <textarea
           ref={ref}
           className="chat-textarea"
-          placeholder="Ask anything about recent news…"
+          placeholder={placeholder || "Ask anything about recent news…"}
           value={text}
           onChange={handleInput}
           onKeyDown={handleKeyDown}

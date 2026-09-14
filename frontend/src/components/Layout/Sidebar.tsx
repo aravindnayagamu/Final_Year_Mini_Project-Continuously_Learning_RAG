@@ -5,6 +5,7 @@ import type { HealthResponse } from "@/types";
 
 const NAV_ITEMS = [
   { to: "/chat",      icon: "", label: "Chat" },
+  { to: "/research",  icon: "", label: "Research Assistant" },
   { to: "/dashboard", icon: "", label: "Dashboard" },
   { to: "/ingest",    icon: "", label: "Ingestion" },
 ];
@@ -45,7 +46,6 @@ export default function Sidebar() {
 
   return (
     <aside className="sidebar">
-      {/* Logo */}
       <div className="sidebar-logo">
         <div className="sidebar-logo-icon"></div>
         <div className="sidebar-logo-text">
@@ -55,7 +55,6 @@ export default function Sidebar() {
         </div>
       </div>
 
-      {/* Navigation */}
       <nav className="sidebar-nav">
         <span className="nav-section-label">Navigation</span>
         {NAV_ITEMS.map(({ to, icon, label }) => (
@@ -72,7 +71,6 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      {/* Health footer */}
       <div className="sidebar-footer">
         <div className="health-indicator">
           <span className={`health-dot ${dotClass}`} />

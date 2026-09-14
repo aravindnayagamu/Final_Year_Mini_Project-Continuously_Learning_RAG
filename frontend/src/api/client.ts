@@ -7,12 +7,16 @@ import type {
   IngestResponse,
   IngestionRunOut,
   HealthResponse,
+  ResearchPaper,
+  ResearchUploadResponse,
+  ResearchQueryRequest,
+  ResearchQueryResponse,
 } from "@/types";
 
 const api = axios.create({
   baseURL: "/api/v1",
   headers: { "Content-Type": "application/json" },
-  timeout: 60_000,
+  timeout: 120_000,
 });
 
 export const postQuery = (payload: QueryRequest): Promise<QueryResponse> =>
@@ -40,3 +44,25 @@ export const getIngestionRun = (id: number): Promise<IngestionRunOut> =>
 
 export const getHealth = (): Promise<HealthResponse> =>
   api.get<HealthResponse>("/health").then((r) => r.data);
+
+export const uploadResearchPaper = (file: File): Promise<ResearchUploadResponse> => {
+  const formData = new FormData();
+  formData.append("file", file);
+  return api
+    .post<ResearchUploadResponse>("/research/upload", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+      timeout: 180_000,
+    })
+    .then((r) => r.data);
+};
+
+export const getResearchPapers = (): Promise<ResearchPaper[]> =>
+  api.get<ResearchPaper[]>("/research/papers").then((r) => r.data);
+
+export const queryResearchPaper = (
+  payload: ResearchQueryRequest
+): Promise<ResearchQueryResponse> =>
+  api.post<ResearchQueryResponse>("/research/query", payload).then((r) => r.data);
+
+export const deleteResearchPaper = (paperId: string): Promise<{ status: string }> =>
+  api.delete<{ status: string }>(`/research/papers/${paperId}`).then((r) => r.data);

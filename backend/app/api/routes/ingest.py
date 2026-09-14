@@ -1,0 +1,64 @@
+from __future__ import annotations
+
+import asyncio
+import logging
+from typing import List
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.db.session import get_db
+from app.schemas.ingest import IngestResponse, IngestionRunOut
+from app.services import ingest_service, metadata_service
+
+logger = logging.getLogger(__name__)
+router = APIRouter()
+
+_ingestion_lock = asyncio.Lock()
+
+
+@router.post("/ingest", response_model=IngestResponse, tags=["Ingestion"])
+async def trigger_ingestion(background_tasks: BackgroundTasks) -> IngestResponse:
+    logger.info("POST /ingest | manual trigger requested")
+    if _ingestion_lock.locked():
+        logger.warning("POST /ingest | rejected — ingestion already running")
+        raise HTTPException(
+            status_code=409,
+            detail="An ingestion job is already running. Please wait.",
+        )
+
+    async def _run() -> None:
+        async with _ingestion_lock:
+            logger.info("Background ingestion job starting")
+            run_id = await ingest_service.run_ingestion(triggered_by="manual")
+            logger.info("Background ingestion job done | run_id=%d", run_id)
+
+    background_tasks.add_task(_run)
+    logger.info("POST /ingest | background task queued")
+    return IngestResponse(
+        run_id=-1,
+        status="started",
+        message="Ingestion job started in the background. Check /ingest/runs for updates.",
+    )
+
+
+@router.get("/ingest/runs", response_model=List[IngestionRunOut], tags=["Ingestion"])
+async def list_ingestion_runs(
+    db: AsyncSession = Depends(get_db),
+) -> List[IngestionRunOut]:
+    logger.info("GET /ingest/runs")
+    runs = await metadata_service.get_ingestion_runs(db, limit=20)
+    return [IngestionRunOut.model_validate(r) for r in runs]
+
+
+@router.get("/ingest/runs/{run_id}", response_model=IngestionRunOut, tags=["Ingestion"])
+async def get_ingestion_run(
+    run_id: int,
+    db: AsyncSession = Depends(get_db),
+) -> IngestionRunOut:
+    logger.info("GET /ingest/runs/%d", run_id)
+    run = await metadata_service.get_ingestion_run(db, run_id)
+    if not run:
+        logger.warning("GET /ingest/runs/%d | not found", run_id)
+        raise HTTPException(status_code=404, detail="Run not found.")
+    return IngestionRunOut.model_validate(run)

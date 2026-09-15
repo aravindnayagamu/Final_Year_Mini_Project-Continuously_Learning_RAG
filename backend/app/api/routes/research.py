@@ -4,7 +4,7 @@ from typing import List
 from fastapi import APIRouter, Body, File, HTTPException, Request, UploadFile
 
 from app.core.config import get_settings
-from app.core.limiter import limiter
+from app.core.limiter import limiter, QUERY_RATE_LIMIT
 from app.schemas.research import (
     ResearchPaperOut,
     ResearchQueryRequest,
@@ -49,7 +49,7 @@ async def list_research_papers() -> List[ResearchPaperOut]:
 
 
 @router.post("/query", response_model=ResearchQueryResponse)
-@limiter.limit(lambda: get_settings().query_rate_limit)
+@limiter.limit(QUERY_RATE_LIMIT)
 async def query_research_assistant(
     request: Request,
     payload: ResearchQueryRequest = Body(...),

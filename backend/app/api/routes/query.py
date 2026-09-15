@@ -2,7 +2,7 @@ import logging
 from fastapi import APIRouter, Body, HTTPException, Request
 
 from app.core.config import get_settings
-from app.core.limiter import limiter
+from app.core.limiter import limiter, QUERY_RATE_LIMIT
 from app.schemas.query import QueryRequest, QueryResponse
 from app.services import rag_service
 
@@ -12,7 +12,7 @@ settings = get_settings()
 
 
 @router.post("/query", response_model=QueryResponse, tags=["RAG"])
-@limiter.limit(lambda: get_settings().query_rate_limit)
+@limiter.limit(QUERY_RATE_LIMIT)
 async def query(request: Request, payload: QueryRequest = Body(...)) -> QueryResponse:
     logger.info("POST /query | question=%r k=%d", payload.question[:80], payload.k)
     try:

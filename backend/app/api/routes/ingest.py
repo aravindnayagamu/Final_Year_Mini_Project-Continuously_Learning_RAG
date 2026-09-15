@@ -6,7 +6,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
-from app.core.limiter import limiter
+from app.core.limiter import limiter, INGEST_RATE_LIMIT
 from app.db.session import get_db
 from app.schemas.ingest import IngestResponse, IngestionRunOut
 from app.services import ingest_service, metadata_service
@@ -19,7 +19,7 @@ _ingestion_lock = asyncio.Lock()
 
 
 @router.post("/ingest", response_model=IngestResponse, tags=["Ingestion"])
-@limiter.limit(lambda: get_settings().ingest_rate_limit)
+@limiter.limit(INGEST_RATE_LIMIT)
 async def trigger_ingestion(
     request: Request,
     background_tasks: BackgroundTasks,

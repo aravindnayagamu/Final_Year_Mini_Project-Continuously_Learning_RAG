@@ -1,8 +1,11 @@
+import logging
 import os
 from pathlib import Path
 import time
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
+
+logger = logging.getLogger(__name__)
 
 cur_dir = Path(__file__).resolve().parent
 sqlite_url = os.getenv("SQLITE_DB_URL", "")
@@ -62,6 +65,25 @@ def retrieve_documents(question, k=3):
         result["document"]
         for result in relevant_documents
     )
+
+    # -----------------------------------------------------------------------
+    # Retrieval metrics – logged every time retrieve_documents() is called
+    # -----------------------------------------------------------------------
+    logger.info(
+        "[RETRIEVAL METRICS] top_k=%d  retrieval_time=%.2f ms  relevant_chunks=%d",
+        len(results["documents"][0]),
+        retrieval_time * 1000,
+        len(relevant_documents),
+    )
+    for rank, result in enumerate(retrieved_documents, start=1):
+        logger.info(
+            "[CHUNK #%d]  distance=%.4f  relevance=%.4f  source=%s  start_index=%s",
+            rank,
+            result["distance"],
+            result["relevance"],
+            result["metadata"].get("source", "Unknown"),
+            result["metadata"].get("start_index", "Unknown"),
+        )
 
     return retrieved_documents, relevant_documents, merged_context, retrieval_time
 

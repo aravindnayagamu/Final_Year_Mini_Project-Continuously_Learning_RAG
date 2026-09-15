@@ -27,8 +27,8 @@ def create_limiter() -> Limiter:
         # Eagerly verify the Redis connection so failures are loud at startup
         if settings.redis_url:
             try:
-                from limits.storage import storage as _storage_factory  # type: ignore
-                store = _storage_factory(storage_uri)
+                from limits.storage import storage_from_string as _storage_from_string
+                store = _storage_from_string(storage_uri)
                 store.check()
                 logger.info(
                     "Redis rate-limit storage connected OK | host=%s",

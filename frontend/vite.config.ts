@@ -17,14 +17,27 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
         configure: (proxy) => {
+          // Set Connection: close so every proxied request doesn't hold
+          // a persistent socket open – prevents TIME_WAIT pile-up.
           proxy.on("proxyReq", (proxyReq) => {
             proxyReq.setHeader("Connection", "close");
           });
-          proxy.removeAllListeners("error");
-          proxy.on("error", (_err, _req, res) => {
-            if (res && "writeHead" in res && !res.headersSent) {
-              res.writeHead(502, { "Content-Type": "application/json" });
-              res.end(JSON.stringify({ error: "Backend unavailable" }));
+
+          // Swallow proxy errors silently (ECONNRESET / ECONNREFUSED when
+          // the backend is not yet up) and return a clean 502 instead of
+          // crashing or printing a stack trace.
+          proxy.on("error", (err, _req, res) => {
+            const code = (err as NodeJS.ErrnoException).code ?? "";
+            if (!["ECONNRESET", "ECONNREFUSED", "ETIMEDOUT"].includes(code)) {
+              console.warn("[proxy]", err.message);
+            }
+            if (res && "writeHead" in res && !(res as import("http").ServerResponse).headersSent) {
+              (res as import("http").ServerResponse).writeHead(502, {
+                "Content-Type": "application/json",
+              });
+              (res as import("http").ServerResponse).end(
+                JSON.stringify({ error: "Backend unavailable" })
+              );
             }
           });
         },

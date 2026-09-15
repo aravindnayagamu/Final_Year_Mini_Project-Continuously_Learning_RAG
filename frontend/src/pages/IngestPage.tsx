@@ -25,12 +25,12 @@ export default function IngestPage() {
 
   useEffect(() => {
     fetchRuns();
-    // Poll every 5s if there's a running job
-    const id = setInterval(() => {
-      fetchRuns();
-    }, 5_000);
+    // Fast-poll (5 s) while a job is running; slow-poll (30 s) otherwise.
+    // Re-register whenever hasRunning flips so the interval is correct.
+    const interval = hasRunning ? 5_000 : 30_000;
+    const id = setInterval(fetchRuns, interval);
     return () => clearInterval(id);
-  }, [fetchRuns]);
+  }, [fetchRuns, hasRunning]);
 
   const handleTrigger = async () => {
     setTriggering(true);

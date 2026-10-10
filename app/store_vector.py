@@ -6,6 +6,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
+import sqlite3
 
 
 cur_dir=Path(__file__)
@@ -14,6 +15,7 @@ base_dir=cur_dir.resolve().parent.parent
 unread_dir=base_dir/'app'/'news_database'/'unread'
 read_dir=base_dir/'app'/'news_database'/'read'
 db_dir = base_dir / 'app' / 'vector_db'
+metadata_db = base_dir / 'metadata.db'
 db_dir.mkdir(parents=True, exist_ok=True)
 
 embedding_model = HuggingFaceEmbeddings(
@@ -36,15 +38,36 @@ def extract_text(path):
             full_text+=text+"\n"
     return full_text
 
+def get_article_metadata(file_name):
+    paper_id = Path(file_name).stem.rsplit("_", 1)[-1]
+    with sqlite3.connect(metadata_db) as conn:
+        row = conn.execute(
+            "SELECT source_name, paper_retrieval_time FROM document_metadata WHERE paper_id = ?",
+            (paper_id,)
+        ).fetchone()
+    if row:
+        return paper_id, row[0], row[1]
+    return paper_id, "Unknown", None
+
+
 def chunk_text(text, file_name):
     text = text.strip()
     if not text:
         return []
-    
+
+    paper_id, source_name, retrieval_time = get_article_metadata(file_name)
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=2000, chunk_overlap=300, add_start_index=True
     )
-    doc = Document(page_content=text, metadata={"source": file_name})
+    doc = Document(
+        page_content=text,
+        metadata={
+            "source": file_name,
+            "paper_id": paper_id,
+            "source_name": source_name,
+            "paper_retrieval_time": retrieval_time
+        }
+    )
     all_splits = text_splitter.split_documents([doc])
     cleaned_splits = []
     for chunk in all_splits:
@@ -54,21 +77,34 @@ def chunk_text(text, file_name):
     #print(f"The type of the chunk after splitting is {type(cleaned_splits[0])}")
     return cleaned_splits
 
+
 def process_unread_files():
-    for file in unread_dir.iterdir():
-        
-        if file.suffix.lower()=='.pdf':
-            text=extract_text(file)
-            #print(f"Read {file.name} with {len(text)} characters")
-            #print(text[:1000])
-            text_chunk=chunk_text(text,file.name)
-            #print(type(text_chunk))
-            text_embedded=embedded_text(text_chunk)
-            dest=read_dir/file.name
-            shutil.move(file,dest)
-            
-    return 
-    
+    unread_dir.mkdir(parents=True, exist_ok=True)
+    read_dir.mkdir(parents=True, exist_ok=True)
+
+    for file in list(unread_dir.iterdir()):
+        if file.suffix.lower() != ".pdf":
+            continue
+
+        if not file.exists():
+            print(f"Skipping missing file: {file.name}")
+            continue
+
+        try:
+            text = extract_text(file)
+            text_chunk = chunk_text(text, file.name)
+            embedded_text(text_chunk)
+
+            if file.exists():
+                dest = read_dir / file.name
+                shutil.move(str(file), str(dest))
+                print(f"Processed and moved: {file.name}")
+
+        except FileNotFoundError:
+            print(f"File no longer exists; skipping: {file.name}")
+
+    return
+
 
 def embedded_text(chunks):
     if not chunks:

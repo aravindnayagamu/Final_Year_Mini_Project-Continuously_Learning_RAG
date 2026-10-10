@@ -11,6 +11,7 @@ from langchain_chroma import Chroma
 CUR_DIR = Path(__file__).resolve().parent
 
 VECTOR_DB = CUR_DIR / "vector_db"
+HISTORICAL_VECTOR_DB = CUR_DIR / "historical_vector_db"
 
 
 load_dotenv()
@@ -33,10 +34,15 @@ embedding_model = HuggingFaceEmbeddings(
     model_name="sentence-transformers/all-MiniLM-L6-v2"
 )
 
-vector_store = Chroma(
+recent_store = Chroma(
     collection_name="recent_news_docs",
     embedding_function=embedding_model,
     persist_directory=str(VECTOR_DB)
+)
+historical_store = Chroma(
+    collection_name="historical_news_docs",
+    embedding_function=embedding_model,
+    persist_directory=str(HISTORICAL_VECTOR_DB)
 )
 
 
@@ -59,17 +65,8 @@ NEWS_CATEGORIES = {
 }
 
 
-def retrieve_category_news(
-    category_query,
-    k=5
-):
-
-    documents = vector_store.similarity_search(
-        category_query,
-        k=k
-    )
-
-    return documents
+def retrieve_category_news(store, category_query, k=5):
+    return store.similarity_search(category_query, k=k)
 
 
 def remove_duplicates(documents):
@@ -119,65 +116,26 @@ def remove_duplicates(documents):
     return unique_documents
 
 
-def build_context(category_documents):
-
+def build_context(recent_category_documents, historical_category_documents):
     context_parts = []
-
-
-    for category, documents in category_documents.items():
-
-        context_parts.append(
-            f"\n\n##############################\n"
-            f"{category}\n"
-            f"##############################\n"
-        )
-
-
-        for index, document in enumerate(
-            documents,
-            start=1
-        ):
-
-            metadata = document.metadata
-
-            source = metadata.get(
-                "source",
-                "Unknown"
-            )
-
-            paper_id = metadata.get(
-                "paper_id",
-                "Unknown"
-            )
-
-            chunk_id = metadata.get(
-                "chunk_id",
-                "Unknown"
-            )
-
-
-            context_parts.append(
-                f"""
---- NEWS CHUNK {index} ---
-
-Paper ID:
-{paper_id}
-
-Chunk ID:
-{chunk_id}
-
-Source:
-{source}
-
-Content:
-{document.page_content}
-
-"""
-            )
-
-
+    groups = (
+        ("RECENT NEWS (downloaded within the last 24 hours)", recent_category_documents),
+        ("HISTORICAL NEWS (downloaded more than 24 hours ago)", historical_category_documents),
+    )
+    for label, category_documents in groups:
+        context_parts.append(f"\n\n================ {label} ================\n")
+        for category, documents in category_documents.items():
+            context_parts.append(f"\n--- {category} ---\n")
+            for index, document in enumerate(documents, start=1):
+                metadata = document.metadata
+                context_parts.append(
+                    f"\nNEWS CHUNK {index}\n"
+                    f"Source: {metadata.get('source', 'Unknown')}\n"
+                    f"Downloaded: {metadata.get('paper_retrieval_time', 'Unknown')}\n"
+                    f"Paper ID: {metadata.get('paper_id', 'Unknown')}\n"
+                    f"Content:\n{document.page_content}\n"
+                )
     return "\n".join(context_parts)
-
 
 
 def build_summary_prompt(context):
@@ -213,27 +171,18 @@ IMPORTANT RULES:
 8. If there is no relevant news for a category, write:
    "No relevant news found in the retrieved context."
 
-Organize the output into exactly these five sections:
+Organize the output into these sections, keeping recent and historical news separate:
 
-## NATIONAL NEWS
+## RECENT / HOT NEWS (LAST 24 HOURS)
+Include subsections for NATIONAL NEWS, STATE / DISTRICT NEWS, SPORTS,
+FINANCIAL / BUSINESS NEWS, and POLITICAL NEWS.
 
-Important national-level developments.
+## HISTORICAL NEWS (OLDER THAN 24 HOURS)
+Include subsections for NATIONAL NEWS, STATE / DISTRICT NEWS, SPORTS,
+FINANCIAL / BUSINESS NEWS, and POLITICAL NEWS.
 
-## STATE / DISTRICT NEWS
-
-Important state-level and district-level developments.
-
-## SPORTS
-
-Important sports developments.
-
-## FINANCIAL / BUSINESS NEWS
-
-Important financial, economic and business developments.
-
-## POLITICAL NEWS
-
-Important political developments.
+Clearly identify the download timestamp when available. Do not describe historical
+news as breaking or current. If a section has no relevant results, say so.
 
 For each important story:
 
@@ -277,64 +226,35 @@ def generate_summary(context):
     return response.output_text
 
 def create_summary():
-    print("\nRetrieving news...\n")
+    print("\nRetrieving recent and historical news...\n")
     start_time = time.perf_counter()
-    category_documents = {}
-    for category, query in NEWS_CATEGORIES.items():
-        print(
-            f"Retrieving: {category}"
-        )
-        documents = retrieve_category_news(
-            query,
-            k=5
-        )
-        category_documents[category] = documents
-    for category in category_documents:
+    recent_category_documents = {}
+    historical_category_documents = {}
 
-        category_documents[category] = (
-            remove_duplicates(
-                category_documents[category]
-            )
-        )
-    end_time = time.perf_counter()
-    retrieval_time = (
-        end_time - start_time
-    )    
-    total_chunks = sum(
-        len(documents)
-        for documents
-        in category_documents.values()
+    for category, query in NEWS_CATEGORIES.items():
+        print(f"Retrieving recent: {category}")
+        recent_category_documents[category] = retrieve_category_news(recent_store, query, k=5)
+        print(f"Retrieving historical: {category}")
+        historical_category_documents[category] = retrieve_category_news(historical_store, query, k=5)
+
+    for category in NEWS_CATEGORIES:
+        recent_category_documents[category] = remove_duplicates(recent_category_documents[category])
+        historical_category_documents[category] = remove_duplicates(historical_category_documents[category])
+
+    retrieval_time = time.perf_counter() - start_time
+    total_chunks = sum(len(docs) for docs in recent_category_documents.values()) + sum(
+        len(docs) for docs in historical_category_documents.values()
     )
-    print(
-        f"\nRetrieved {total_chunks} unique chunks."
-    )
-    print(
-        f"Retrieval time: "
-        f"{retrieval_time * 1000:.2f} ms"
-    )
-    context = build_context(
-        category_documents
-    )
-    print(
-        "\nGenerating news summary..."
-    )
-    summary = generate_summary(
-        context
-    )
-    print(
-        "\n"
-        + "=" * 80
-    )
-    print(
-        "NEWS SUMMARY"
-    )
-    print(
-        "=" * 80
-    )
+    print(f"\nRetrieved {total_chunks} chunks across both databases.")
+    print(f"Retrieval time: {retrieval_time * 1000:.2f} ms")
+    context = build_context(recent_category_documents, historical_category_documents)
+    print("\nGenerating news summary...")
+    summary = generate_summary(context)
+    print("\n" + "=" * 80)
+    print("NEWS SUMMARY")
+    print("=" * 80)
     print(summary)
-    print(
-        "=" * 80
-    )
+    print("=" * 80)
     return summary
 
 if __name__ == "__main__":

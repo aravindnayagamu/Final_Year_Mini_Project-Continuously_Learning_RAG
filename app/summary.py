@@ -1,12 +1,18 @@
 import time
 import os
 from pathlib import Path
-
 from dotenv import load_dotenv
 from google import genai
-
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
+import json
+
+
+CUR_DIR = Path(__file__).resolve().parent
+user_preferences=""
+with (CUR_DIR / "user_preferences.json").open(
+    "r", encoding="utf-8") as file:
+    user_preferences = json.load(file)
 
 CUR_DIR = Path(__file__).resolve().parent
 
@@ -69,6 +75,7 @@ def retrieve_category_news(store, category_query, k=5):
     return store.similarity_search(category_query, k=k)
 
 
+
 def remove_duplicates(documents):
 
     unique_documents = []
@@ -115,6 +122,45 @@ def remove_duplicates(documents):
 
     return unique_documents
 
+def retrieve_personalized_news(store, k=5):
+    categories = user_preferences.get("news_categories", [])
+    interests = user_preferences.get("specific_interests", [])
+    location = user_preferences.get("preferred_location", "")
+
+    queries = []
+
+    if location:
+        queries.append(f"Local and regional news in {location}")
+
+    for category in categories:
+        if "state" in category.lower() and location:
+            queries.append(f"{category} in {location}")
+        else:
+            queries.append(category)
+
+    for interest in interests:
+        queries.append(f"News and recent developments about {interest}")
+
+    if not queries:
+        return []
+
+    candidate_groups = [
+        store.similarity_search(query, k=2)
+        for query in queries
+    ]
+
+    candidates = []
+    max_length = max(
+        (len(group) for group in candidate_groups),
+        default=0
+    )
+
+    for index in range(max_length):
+        for group in candidate_groups:
+            if index < len(group):
+                candidates.append(group[index])
+
+    return remove_duplicates(candidates)[:k]
 
 def build_context(recent_category_documents, historical_category_documents):
     context_parts = []
@@ -184,11 +230,33 @@ FINANCIAL / BUSINESS NEWS, and POLITICAL NEWS.
 Clearly identify the download timestamp when available. Do not describe historical
 news as breaking or current. If a section has no relevant results, say so.
 
+USER PREFERENCES:
+
+- User: {user_preferences.get("user_name", "User")}
+- Location: {user_preferences.get("preferred_location", "")}
+- Preferred categories: {", ".join(user_preferences.get("news_categories", []))}
+- Specific interests: {", ".join(user_preferences.get("specific_interests", []))}
+- Summary detail: {user_preferences.get("summary_detail", "Balanced")}
+- Topics to avoid: {", ".join(user_preferences.get("topics_to_avoid", []))}
+- Preferred language: {user_preferences.get("preferred_language", "English")}
+
+PERSONALIZED NEWS:
+
+- Within both the RECENT / HOT NEWS and HISTORICAL NEWS
+  sections, include a subsection named PERSONALIZED NEWS FOR YOU.
+- Use the context under PERSONALIZED NEWS FOR YOU to identify
+  stories matching the user's preferred location, news categories,
+  and specific interests.
+- Give relevant personalized stories appropriate prominence.
+- Do not force personalization when the retrieved stories do not
+  match the user's preferences.
+- Do not invent personalized stories or facts.
 For each important story:
 
 - Give a short headline.
 - Give a 2–4 sentence summary.
 - Mention the source when available.
+
 
 Finally provide:
 
@@ -220,7 +288,7 @@ def generate_summary(context):
         context
     )
     response = client.interactions.create(
-        model="gemini-3.8-flash",
+        model="gemini-3.5-flash",
         input=prompt
     )
     return response.output_text
@@ -236,11 +304,26 @@ def create_summary():
         recent_category_documents[category] = retrieve_category_news(recent_store, query, k=5)
         print(f"Retrieving historical: {category}")
         historical_category_documents[category] = retrieve_category_news(historical_store, query, k=5)
+    
+    print("Retrieving personalized news...")
 
-    for category in NEWS_CATEGORIES:
-        recent_category_documents[category] = remove_duplicates(recent_category_documents[category])
-        historical_category_documents[category] = remove_duplicates(historical_category_documents[category])
+    recent_category_documents["PERSONALIZED NEWS FOR YOU"] = (
+        retrieve_personalized_news(recent_store, k=5)
+    )
 
+    historical_category_documents["PERSONALIZED NEWS FOR YOU"] = (
+        retrieve_personalized_news(historical_store, k=5)
+    )
+
+    for category in recent_category_documents:
+        recent_category_documents[category] = remove_duplicates(
+            recent_category_documents[category]
+        )
+
+    for category in historical_category_documents:
+        historical_category_documents[category] = remove_duplicates(
+            historical_category_documents[category]
+        )
     retrieval_time = time.perf_counter() - start_time
     total_chunks = sum(len(docs) for docs in recent_category_documents.values()) + sum(
         len(docs) for docs in historical_category_documents.values()

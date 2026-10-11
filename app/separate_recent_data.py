@@ -53,39 +53,66 @@ def lookup_download_time(metadata):
 
 def separate_data():
     cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+
     batch = recent_store._collection.get(
         include=["documents", "metadatas"]
     )
+
     ids = batch.get("ids", [])
-    moved = recent_count = unknown_count = 0
+    moved = 0
+    recent_count = 0
+    unknown_moved = 0
     old_ids = []
 
     for i, record_id in enumerate(ids):
         document = batch["documents"][i]
         metadata = dict(batch["metadatas"][i] or {})
+
         timestamp = lookup_download_time(metadata)
         parsed = parse_timestamp(timestamp)
+
         if timestamp:
             metadata["paper_retrieval_time"] = timestamp
+
+        # Move unknown-timestamp chunks to historical storage.
         if parsed is None:
-            unknown_count += 1
+            historical_store._collection.upsert(
+                ids=[record_id],
+                documents=[document],
+                metadatas=[metadata]
+            )
+            old_ids.append(record_id)
+            unknown_moved += 1
             continue
+
+        # Move chunks older than 24 hours to historical storage.
         if parsed < cutoff:
             historical_store._collection.upsert(
-                ids=[record_id], documents=[document], metadatas=[metadata]
+                ids=[record_id],
+                documents=[document],
+                metadatas=[metadata]
             )
             old_ids.append(record_id)
             moved += 1
+
+        # Retain chunks downloaded within the last 24 hours.
         else:
-            if timestamp:
-                recent_store._collection.update(ids=[record_id], metadatas=[metadata])
+            recent_store._collection.update(
+                ids=[record_id],
+                metadatas=[metadata]
+            )
             recent_count += 1
+
+    # Delete from the recent DB only after destination upserts succeed.
     if old_ids:
         recent_store._collection.delete(ids=old_ids)
-    print(f"Historical chunks moved: {moved}")
+
+    print(f"Historical chunks moved (older than 24 hours): {moved}")
+    print(f"Unknown-time chunks moved to historical DB: {unknown_moved}")
+    print(f"Total historical chunks moved: {moved + unknown_moved}")
     print(f"Recent chunks retained: {recent_count}")
-    print(f"Unknown-time chunks retained in recent DB: {unknown_count}")
 
 
 if __name__ == "__main__":
     separate_data()
+    

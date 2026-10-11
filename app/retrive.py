@@ -1,3 +1,4 @@
+from record_metrics import update_metrics
 from pathlib import Path
 import time
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -17,21 +18,33 @@ historical_store = Chroma(
 )
 
 
+
 def retrieve_from_store(store, question, k, news_type):
     results = store._collection.query(
-        query_texts=[question], n_results=k,
+        query_texts=[question],
+        n_results=k,
         include=["documents", "metadatas", "distances"]
     )
+
+    ids = results["ids"][0]
     relevance_function = store._select_relevance_score_fn()
     retrieved = []
-    for document, metadata, distance in zip(
-        results["documents"][0], results["metadatas"][0], results["distances"][0]
+
+    for record_id, document, metadata, distance in zip(
+        ids,
+        results["documents"][0],
+        results["metadatas"][0],
+        results["distances"][0]
     ):
         retrieved.append({
-            "document": document, "metadata": metadata or {},
-            "distance": distance, "relevance": relevance_function(distance),
+            "id": record_id,
+            "document": document,
+            "metadata": metadata or {},
+            "distance": distance,
+            "relevance": relevance_function(distance),
             "news_type": news_type
         })
+
     return retrieved
 
 

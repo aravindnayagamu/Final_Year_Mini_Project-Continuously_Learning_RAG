@@ -6,6 +6,7 @@ from google import genai
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 import json
+from record_metrics import update_metrics
 
 
 CUR_DIR = Path(__file__).resolve().parent
@@ -71,9 +72,29 @@ NEWS_CATEGORIES = {
 }
 
 
-def retrieve_category_news(store, category_query, k=5):
-    return store.similarity_search(category_query, k=k)
+def retrieve_category_news(
+    store,
+    category_query,
+    k=5,
+    source="recent"
+):
+    start_time = time.perf_counter()
 
+    documents = store.similarity_search(
+        category_query,
+        k=k
+    )
+
+    elapsed_ms = (time.perf_counter() - start_time) * 1000
+
+    update_metrics(
+        query=category_query,
+        documents=documents,
+        source=source,
+        retrieval_time_ms=elapsed_ms,
+    )
+
+    return documents
 
 
 def remove_duplicates(documents):
@@ -122,7 +143,7 @@ def remove_duplicates(documents):
 
     return unique_documents
 
-def retrieve_personalized_news(store, k=5):
+def retrieve_personalized_news(store, k=5,source="recent"):
     categories = user_preferences.get("news_categories", [])
     interests = user_preferences.get("specific_interests", [])
     location = user_preferences.get("preferred_location", "")
@@ -144,10 +165,23 @@ def retrieve_personalized_news(store, k=5):
     if not queries:
         return []
 
-    candidate_groups = [
-        store.similarity_search(query, k=2)
-        for query in queries
-    ]
+    candidate_groups = []
+
+    for query in queries:
+        start_time = time.perf_counter()
+
+        documents = store.similarity_search(query, k=2)
+
+        elapsed_ms = (time.perf_counter() - start_time) * 1000
+
+        update_metrics(
+            query=query,
+            documents=documents,
+            source=source,
+            retrieval_time_ms=elapsed_ms,
+        )
+
+        candidate_groups.append(documents)
 
     candidates = []
     max_length = max(
@@ -301,18 +335,18 @@ def create_summary():
 
     for category, query in NEWS_CATEGORIES.items():
         print(f"Retrieving recent: {category}")
-        recent_category_documents[category] = retrieve_category_news(recent_store, query, k=5)
+        recent_category_documents[category] = retrieve_category_news(recent_store, query, k=5,source="recent")
         print(f"Retrieving historical: {category}")
-        historical_category_documents[category] = retrieve_category_news(historical_store, query, k=5)
+        historical_category_documents[category] = retrieve_category_news(historical_store, query, k=5,source="historical")
     
     print("Retrieving personalized news...")
 
     recent_category_documents["PERSONALIZED NEWS FOR YOU"] = (
-        retrieve_personalized_news(recent_store, k=5)
+        retrieve_personalized_news(recent_store, k=5,source="recent")
     )
 
     historical_category_documents["PERSONALIZED NEWS FOR YOU"] = (
-        retrieve_personalized_news(historical_store, k=5)
+        retrieve_personalized_news(historical_store, k=5,source="historical")
     )
 
     for category in recent_category_documents:

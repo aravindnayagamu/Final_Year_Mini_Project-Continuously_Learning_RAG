@@ -4,6 +4,7 @@
 *.env
 *.bin
 *.json
+*.pickle
 
 backend/app/news_database/
 backend/app/vector_db/

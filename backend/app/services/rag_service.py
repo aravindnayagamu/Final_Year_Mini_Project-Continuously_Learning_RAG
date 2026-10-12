@@ -122,7 +122,7 @@ async def answer_question(question: str, k: int = 5) -> QueryResponse:
         for r in retrieved_docs
     ]
 
-    pipeline_service.record_query_metrics(question, retrieved_docs, retrieval_time_ms)
+    pipeline_service.record_query_metrics(question, retrieved_docs, retrieval_time_ms, candidate_pool=relevant_docs)
 
     if not merged_context:
         logger.warning("No relevant context found for question: %r", question[:80])

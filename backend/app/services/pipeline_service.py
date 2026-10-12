@@ -73,7 +73,7 @@ def reset_metrics() -> Dict[str, Any]:
     return get_metrics()
 
 
-def record_query_metrics(question: str, retrieved: list, retrieval_time_ms: float) -> None:
+def record_query_metrics(question: str, retrieved: list, retrieval_time_ms: float, candidate_pool: list | None = None) -> None:
     try:
         from record_metrics import update_metrics  # type: ignore[import]
 
@@ -83,6 +83,7 @@ def record_query_metrics(question: str, retrieved: list, retrieval_time_ms: floa
             source="unknown",
             retrieval_time_ms=retrieval_time_ms,
             track_precision_at_6=True,
+            candidate_pool=candidate_pool,
         )
     except Exception as exc:
         logger.warning("Failed to record retrieval metrics: %s", exc)
@@ -183,3 +184,76 @@ def save_user_preferences(preferences: Dict[str, Any]) -> Dict[str, Any]:
     existing.pop("preferred_language", None)
     path.write_text(json.dumps(existing, ensure_ascii=False, indent=2), encoding="utf-8")
     return existing
+
+
+def run_recall_benchmark(num_samples: int = 15) -> Dict[str, Any]:
+    try:
+        from retrive import recent_store, historical_store, retrieve_documents  # type: ignore[import]
+        from record_metrics import update_metrics  # type: ignore[import]
+    except ImportError:
+        from app.retrive import recent_store, historical_store, retrieve_documents
+        from app.record_metrics import update_metrics
+
+    sampled_items = []
+    try:
+        res_r = recent_store._collection.get(limit=max(15, num_samples), include=["documents", "metadatas"])
+        for doc_id, text, meta in zip(res_r.get("ids", []), res_r.get("documents", []), res_r.get("metadatas", [])):
+            if text and len(text.strip()) > 60:
+                sampled_items.append((doc_id, text, meta))
+    except Exception:
+        pass
+
+    try:
+        res_h = historical_store._collection.get(limit=10, include=["documents", "metadatas"])
+        for doc_id, text, meta in zip(res_h.get("ids", []), res_h.get("documents", []), res_h.get("metadatas", [])):
+            if text and len(text.strip()) > 60:
+                sampled_items.append((doc_id, text, meta))
+    except Exception:
+        pass
+
+    import random
+    if len(sampled_items) > num_samples:
+        random.seed(42)
+        sampled_items = random.sample(sampled_items, num_samples)
+
+    benchmark_results = []
+    for doc_id, text, meta in sampled_items:
+        title = meta.get("title") or meta.get("headline")
+        if not title:
+            lines = [l.strip() for l in text.splitlines() if len(l.strip()) > 20]
+            title = lines[0] if lines else text[:100]
+        query = title[:120].strip()
+
+        target_ids = [str(doc_id)]
+        paper_id = meta.get("paper_id")
+        if paper_id:
+            target_ids.append(str(paper_id))
+
+        retrieved_docs, candidate_pool, _, lat_sec = retrieve_documents(query, k=3)
+        lat_ms = lat_sec * 1000.0
+
+        update_metrics(
+            query=query,
+            documents=retrieved_docs,
+            source="benchmark",
+            retrieval_time_ms=lat_ms,
+            track_precision_at_6=True,
+            ground_truth_relevant_ids=target_ids,
+            candidate_pool=candidate_pool,
+        )
+        top_ids = [r.get("id") for r in retrieved_docs] + [
+            str(r.get("metadata", {}).get("paper_id")) for r in retrieved_docs if r.get("metadata", {}).get("paper_id")
+        ]
+        hit = any(tid in top_ids for tid in target_ids)
+        benchmark_results.append({
+            "query": query,
+            "target_id": doc_id,
+            "hit": hit,
+        })
+
+    return {
+        "status": "success",
+        "evaluated_queries": len(benchmark_results),
+        "hits": sum(1 for b in benchmark_results if b["hit"]),
+        "metrics": get_metrics(),
+    }

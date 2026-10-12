@@ -79,11 +79,15 @@ def retrieve_from_store(store, question, k, news_type):
 
 def retrieve_documents(question, k=3):
     start_time = time.perf_counter()
-    recent = retrieve_from_store(recent_store, question, k, "RECENT NEWS")
-    historical = retrieve_from_store(
-        historical_store, question, k, "HISTORICAL NEWS"
+    pool_k = max(6, k * 2)
+    recent_pool = retrieve_from_store(recent_store, question, pool_k, "RECENT NEWS")
+    historical_pool = retrieve_from_store(
+        historical_store, question, pool_k, "HISTORICAL NEWS"
     )
+    recent = recent_pool[:k]
+    historical = historical_pool[:k]
     results = recent + historical
+    candidate_pool = recent_pool + historical_pool
     context = "\n\n".join(
         f"[{item['news_type']}]\n"
         f"Source: {item['metadata'].get('source', 'Unknown')}\n"
@@ -92,7 +96,7 @@ def retrieve_documents(question, k=3):
         for item in results
     )
     elapsed = time.perf_counter() - start_time
-    return results, results, context, elapsed
+    return results, candidate_pool, context, elapsed
 
 
 def show_results(question):

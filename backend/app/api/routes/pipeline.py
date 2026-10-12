@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from typing import Any, Dict, List, Optional
 
@@ -110,3 +111,9 @@ async def summary_preferences() -> Dict[str, Any]:
 @router.post("/summary/preferences", tags=["Summary"])
 async def update_summary_preferences(payload: Dict[str, Any]) -> Dict[str, Any]:
     return pipeline_service.save_user_preferences(payload)
+
+
+@router.post("/metrics/benchmark", tags=["Metrics"])
+async def run_benchmark(num_samples: int = 15) -> Dict[str, Any]:
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, pipeline_service.run_recall_benchmark, num_samples)

@@ -1,5 +1,9 @@
 import time
 import os
+os.environ["USE_TF"] = "0"
+os.environ["TRANSFORMERS_NO_TF"] = "1"
+os.environ["USE_TORCH"] = "1"
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 import concurrent.futures
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
@@ -202,11 +206,14 @@ def retrieve_category_news(store, category_name, category_query, k=5, source="re
 
     elapsed_ms = (time.perf_counter() - start_time) * 1000
 
+    pool = candidates_24h if candidates_24h else (candidates_3d if candidates_3d else docs)
     update_metrics(
         query=category_query,
         documents=docs,
         source=source,
         retrieval_time_ms=elapsed_ms,
+        track_precision_at_6=True,
+        candidate_pool=pool,
     )
 
     return docs

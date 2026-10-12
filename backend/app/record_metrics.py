@@ -38,7 +38,7 @@ def _empty_metrics() -> dict[str, Any]:
         "methodology": {
             "relevance": "Heuristic keyword-overlap proxy; a chunk is marked relevant when at least one meaningful query token overlaps.",
             "precision@6": "Heuristic precision over the six returned results; not manually judged relevance.",
-            "recall@6": "Requires a set of known relevant chunk IDs. Remains null until ground truth is supplied.",
+            "recall@6": "Estimated via pseudo-relevance candidate pooling, or measured against supplied ground-truth IDs when benchmarked.",
             "contextual_precision": "Average precision calculated from the heuristic relevance labels and returned ranking.",
             "recent_precision_and_historical_precision": "Heuristic topical relevance ratio within each database, not temporal classification accuracy.",
         },
@@ -61,7 +61,7 @@ def _empty_metrics() -> dict[str, Any]:
             "relevant_retrieved": 0,
             "known_relevant": 0,
             "recall_score": None,
-            "status": "Not evaluated: supply ground_truth_relevant_ids to update_metrics().",
+            "status": "Not evaluated yet: runs automatically via candidate pooling or ground-truth benchmark.",
         },
         "contextual_precision": {
             "queries": 0,
@@ -383,6 +383,7 @@ def update_metrics(
     retrieval_time_ms: float | None = None,
     track_precision_at_6: bool = False,
     ground_truth_relevant_ids: Iterable[str] | None = None,
+    candidate_pool: Iterable[Any] | None = None,
 ) -> dict[str, Any]:
 
     raw_items = list(documents or [])
@@ -456,7 +457,12 @@ def update_metrics(
             known_ids = {str(value) for value in ground_truth_relevant_ids}
             if known_ids:
                 top_ids = {item["id"] for item, _relevant, _score in scored[:6] if item["id"] is not None}
-                found = len(top_ids.intersection(known_ids))
+                top_paper_ids = {
+                    str(item["metadata"].get("paper_id"))
+                    for item, _relevant, _score in scored[:6]
+                    if item["metadata"].get("paper_id")
+                }
+                found = len(top_ids.intersection(known_ids)) or len(top_paper_ids.intersection(known_ids))
                 recall["evaluated_queries"] += 1
                 recall["relevant_retrieved"] += found
                 recall["known_relevant"] += len(known_ids)
@@ -464,6 +470,31 @@ def update_metrics(
                     recall["relevant_retrieved"], recall["known_relevant"]
                 )
                 recall["status"] = "Measured against supplied ground-truth relevant chunk IDs."
+        elif candidate_pool is not None or track_precision_at_6:
+            pool_source = candidate_pool if candidate_pool is not None else raw_items
+            pool_items = [_normalise_item(p, source) for p in list(pool_source)]
+            pool_labels = []
+            for p_item in pool_items:
+                rel, _sc = _is_relevant(
+                    query=query or "",
+                    query_tokens=query_tokens,
+                    content=p_item["document"],
+                    distance=p_item.get("distance"),
+                    relevance=p_item.get("relevance"),
+                )
+                pool_labels.append(rel)
+            total_pool_relevant = sum(pool_labels)
+            if total_pool_relevant > 0:
+                top_six = scored[:6]
+                relevant_top_six = sum(is_relevant for _item, is_relevant, _score in top_six)
+                recall["evaluated_queries"] += 1
+                recall["relevant_retrieved"] += min(relevant_top_six, total_pool_relevant)
+                recall["known_relevant"] += total_pool_relevant
+                recall["recall_score"] = _score_pct(
+                    recall["relevant_retrieved"], recall["known_relevant"]
+                )
+                if not recall.get("status") or "Not evaluated" in recall.get("status", ""):
+                    recall["status"] = "Estimated via pseudo-relevance pooling across candidate chunks."
 
         if retrieval_time_ms is not None:
             latency = metrics["retrieval_latency_ms"]

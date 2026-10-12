@@ -3,11 +3,11 @@
 !.env.example
 *.env
 *.bin
+*.json
 
 backend/app/news_database/
 backend/app/vector_db/
 backend/app/research_database/
-backend/app/user_preferences.json
 
 node_modules/
 dist/

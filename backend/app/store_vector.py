@@ -7,19 +7,31 @@ from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 import sqlite3
+from dotenv import load_dotenv
 
+ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
+load_dotenv(dotenv_path=ENV_FILE)
+load_dotenv()
 
-cur_dir=Path(__file__)
-#print(cur_dir)
-base_dir=cur_dir.resolve().parent.parent
-unread_dir=base_dir/'app'/'news_database'/'unread'
-read_dir=base_dir/'app'/'news_database'/'read'
-db_dir = base_dir / 'app' / 'vector_db'
+cur_dir = Path(__file__)
+base_dir = cur_dir.resolve().parent.parent
+app_dir_name = os.getenv("APP_DIR", "app")
+
+unread_dir = base_dir / app_dir_name / 'news_database' / 'unread'
+read_dir = base_dir / app_dir_name / 'news_database' / 'read'
+
+sqlite_db_url = os.getenv("SQLITE_DB_URL", "")
+if sqlite_db_url and sqlite_db_url.startswith("sqlite:///"):
+    db_dir = (base_dir / sqlite_db_url.replace("sqlite:///", "")).parent
+else:
+    db_dir = base_dir / app_dir_name / 'vector_db'
+
 metadata_db = base_dir / 'metadata.db'
 db_dir.mkdir(parents=True, exist_ok=True)
 
+embedding_model_name = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 embedding_model = HuggingFaceEmbeddings(
-    model_name="sentence-transformers/all-MiniLM-L6-v2"
+    model_name=embedding_model_name
 )
 vector_store = Chroma(
     collection_name="recent_news_docs",

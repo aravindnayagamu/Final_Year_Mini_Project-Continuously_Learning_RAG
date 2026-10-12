@@ -6,7 +6,11 @@ from google import genai
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 import json
-from record_metrics import update_metrics
+
+try:
+    from record_metrics import update_metrics
+except ImportError:
+    from app.record_metrics import update_metrics
 
 
 CUR_DIR = Path(__file__).resolve().parent
@@ -21,16 +25,22 @@ VECTOR_DB = CUR_DIR / "vector_db"
 HISTORICAL_VECTOR_DB = CUR_DIR / "historical_vector_db"
 
 
+ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
+load_dotenv(dotenv_path=ENV_FILE)
 load_dotenv()
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL")
 
 if not GEMINI_API_KEY:
     raise ValueError("GEMINI_API_KEY not found in .env file.")
+if not GEMINI_MODEL:
+    raise ValueError("GEMINI_MODEL not found in .env file.")
 
 client = genai.Client(api_key=GEMINI_API_KEY)
 
-embedding_model = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+embedding_model = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
 
 recent_store = Chroma(
     collection_name="recent_news_docs",
@@ -282,11 +292,18 @@ END OF RETRIEVED NEWS
 
 def generate_summary(context):
     prompt = build_summary_prompt(context)
-    response = client.interactions.create(
-        model="gemini-3.6-flash-lite",
-        input=prompt
-    )
-    return response.output_text
+    try:
+        response = client.interactions.create(
+            model=GEMINI_MODEL,
+            input=prompt
+        )
+        return response.output_text
+    except Exception:
+        response = client.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=prompt
+        )
+        return response.text or ""
 
 def create_summary():
     print("\nRetrieving recent and historical news...\n")

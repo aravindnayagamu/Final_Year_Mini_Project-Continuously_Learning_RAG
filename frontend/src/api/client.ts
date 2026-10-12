@@ -74,6 +74,9 @@ export const getMetrics = (): Promise<RetrievalMetrics> =>
 export const resetMetrics = (): Promise<RetrievalMetrics> =>
   api.post<RetrievalMetrics>("/metrics/reset").then((r) => r.data);
 
+export const runRecallBenchmark = (numSamples = 15): Promise<{ status: string; evaluated_queries: number; hits: number; metrics: RetrievalMetrics }> =>
+  api.post("/metrics/benchmark", null, { params: { num_samples: numSamples } }).then((r) => r.data);
+
 export const getVectorStats = (): Promise<VectorStats> =>
   api.get<VectorStats>("/maintenance/vector-stats").then((r) => r.data);
 

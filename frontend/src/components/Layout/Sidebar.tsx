@@ -8,6 +8,9 @@ const NAV_ITEMS = [
   { to: "/research",  icon: "", label: "Research Assistant" },
   { to: "/dashboard", icon: "", label: "Dashboard" },
   { to: "/ingest",    icon: "", label: "Ingestion" },
+  { to: "/summary",   icon: "", label: "News Digest" },
+  { to: "/sources",   icon: "", label: "Sources" },
+  { to: "/metrics",   icon: "", label: "Metrics" },
 ];
 
 export default function Sidebar() {

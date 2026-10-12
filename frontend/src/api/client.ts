@@ -11,6 +11,12 @@ import type {
   ResearchUploadResponse,
   ResearchQueryRequest,
   ResearchQueryResponse,
+  SourcesResponse,
+  RetrievalMetrics,
+  VectorStats,
+  SeparationResult,
+  NewsSummary,
+  UserPreferences,
 } from "@/types";
 
 const api = axios.create({
@@ -66,3 +72,27 @@ export const queryResearchPaper = (
 
 export const deleteResearchPaper = (paperId: string): Promise<{ status: string }> =>
   api.delete<{ status: string }>(`/research/papers/${paperId}`).then((r) => r.data);
+
+export const getSources = (): Promise<SourcesResponse> =>
+  api.get<SourcesResponse>("/sources").then((r) => r.data);
+
+export const getMetrics = (): Promise<RetrievalMetrics> =>
+  api.get<RetrievalMetrics>("/metrics").then((r) => r.data);
+
+export const resetMetrics = (): Promise<RetrievalMetrics> =>
+  api.post<RetrievalMetrics>("/metrics/reset").then((r) => r.data);
+
+export const getVectorStats = (): Promise<VectorStats> =>
+  api.get<VectorStats>("/maintenance/vector-stats").then((r) => r.data);
+
+export const separateRecentData = (): Promise<SeparationResult> =>
+  api.post<SeparationResult>("/maintenance/separate-recent", null, { timeout: 300_000 }).then((r) => r.data);
+
+export const getLatestSummary = (): Promise<NewsSummary | null> =>
+  api.get<NewsSummary | null>("/summary").then((r) => r.data);
+
+export const generateSummary = (): Promise<NewsSummary> =>
+  api.post<NewsSummary>("/summary", null, { timeout: 300_000 }).then((r) => r.data);
+
+export const getSummaryPreferences = (): Promise<UserPreferences> =>
+  api.get<UserPreferences>("/summary/preferences").then((r) => r.data);

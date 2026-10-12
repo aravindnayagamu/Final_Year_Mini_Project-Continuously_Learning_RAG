@@ -38,8 +38,152 @@ RSS_SOURCES = [
         "url": "https://timesofindia.indiatimes.com/rssfeedstopstories.cms"
     },
     {
+        "source_name": "TOI_Most_Recent",
+        "url": "http://timesofindia.indiatimes.com/rssfeedmostrecent.cms"
+    },
+    {
+        "source_name": "TOI_India",
+        "url": "http://timesofindia.indiatimes.com/rssfeeds/-2128936835.cms"
+    },
+    {
+        "source_name": "TOI_World",
+        "url": "http://timesofindia.indiatimes.com/rssfeeds/296589292.cms"
+    },
+    {
+        "source_name": "TOI_NRI",
+        "url": "http://timesofindia.indiatimes.com/rssfeeds/7098551.cms"
+    },
+    {
+        "source_name": "TOI_Business",
+        "url": "http://timesofindia.indiatimes.com/rssfeeds/1898055.cms"
+    },
+    {
+        "source_name": "TOI_US",
+        "url": "https://timesofindia.indiatimes.com/rssfeeds_us/72258322.cms"
+    },
+    {
+        "source_name": "TOI_Cricket",
+        "url": "http://timesofindia.indiatimes.com/rssfeeds/54829575.cms"
+    },
+    {
+        "source_name": "TOI_Sports",
+        "url": "http://timesofindia.indiatimes.com/rssfeeds/4719148.cms"
+    },
+    {
+        "source_name": "TOI_Science",
+        "url": "http://timesofindia.indiatimes.com/rssfeeds/-2128672765.cms"
+    },
+    {
+        "source_name": "TOI_Environment",
+        "url": "http://timesofindia.indiatimes.com/rssfeeds/2647163.cms"
+    },
+    {
+        "source_name": "TOI_Tech",
+        "url": "http://timesofindia.indiatimes.com/rssfeeds/66949542.cms"
+    },
+    {
+        "source_name": "TOI_Education",
+        "url": "http://timesofindia.indiatimes.com/rssfeeds/913168846.cms"
+    },
+    {
+        "source_name": "TOI_Entertainment",
+        "url": "http://timesofindia.indiatimes.com/rssfeeds/1081479906.cms"
+    },
+    {
+        "source_name": "TOI_LifeStyle",
+        "url": "http://timesofindia.indiatimes.com/rssfeeds/2886704.cms"
+    },
+    {
+        "source_name": "TOI_Astrology",
+        "url": "https://timesofindia.indiatimes.com/rssfeeds/65857041.cms"
+    },
+    {
+        "source_name": "TOI_Automobiles",
+        "url": "https://timesofindia.indiatimes.com/rssfeeds/74317216.cms"
+    },
+    {
+        "source_name": "TOI_Mumbai",
+        "url": "http://timesofindia.indiatimes.com/rssfeeds/-2128838597.cms"
+    },
+    {
+        "source_name": "TOI_Delhi",
+        "url": "http://timesofindia.indiatimes.com/rssfeeds/-2128839596.cms"
+    },
+    {
+        "source_name": "TOI_Chennai",
+        "url": "http://timesofindia.indiatimes.com/rssfeeds/2950623.cms"
+    },
+    {
+        "source_name": "TOI_Kolkata",
+        "url": "http://timesofindia.indiatimes.com/rssfeeds/-2128830821.cms"
+    },
+    {
         "source_name": "NDTV_Top_Stories",
         "url": "https://feeds.feedburner.com/ndtvnews-top-stories"
+    },
+    {
+        "source_name": "NDTV_Latest_Stories",
+        "url": "https://feeds.feedburner.com/ndtvnews-latest"
+    },
+    {
+        "source_name": "NDTV_Trending_Stories",
+        "url": "https://feeds.feedburner.com/ndtvnews-trending-news"
+    },
+    {
+        "source_name": "NDTV_India",
+        "url": "https://feeds.feedburner.com/ndtvnews-india-news"
+    },
+    {
+        "source_name": "NDTV_World",
+        "url": "https://feeds.feedburner.com/ndtvnews-world-news"
+    },
+    {
+        "source_name": "NDTV_Business",
+        "url": "https://feeds.feedburner.com/ndtvprofit-latest"
+    },
+    {
+        "source_name": "NDTV_Movies",
+        "url": "https://feeds.feedburner.com/ndtvmovies-latest"
+    },
+    {
+        "source_name": "NDTV_Sports",
+        "url": "https://feeds.feedburner.com/ndtvsports-latest"
+    },
+    {
+        "source_name": "NDTV_Cricket",
+        "url": "https://feeds.feedburner.com/ndtvsports-cricket"
+    },
+    {
+        "source_name": "NDTV_Tech",
+        "url": "https://feeds.feedburner.com/gadgets360-latest"
+    },
+    {
+        "source_name": "NDTV_Automobiles",
+        "url": "https://feeds.feedburner.com/carandbike-latest"
+    },
+    {
+        "source_name": "NDTV_Cities",
+        "url": "https://feeds.feedburner.com/ndtvnews-cities-news"
+    },
+    {
+        "source_name": "NDTV_South",
+        "url": "https://feeds.feedburner.com/ndtvnews-south"
+    },
+    {
+        "source_name": "NDTV_NRI",
+        "url": "https://feeds.feedburner.com/ndtvnews-indians-abroad"
+    },
+    {
+        "source_name": "NDTV_Health",
+        "url": "https://feeds.feedburner.com/ndtvcooks-latest"
+    },
+    {
+        "source_name": "NDTV_Offbeat",
+        "url": "https://feeds.feedburner.com/ndtvnews-offbeat-news"
+    },
+    {
+        "source_name": "NDTV_People",
+        "url": "https://feeds.feedburner.com/ndtvnews-people"
     },
     {
         "source_name": "PIB_India",
@@ -53,9 +197,7 @@ def init_databases():
         cursor = conn.cursor()
 
         cursor.execute("""
-            CREATE TABLE IF NOT EXISTS seen_items (
-                original_id TEXT PRIMARY KEY
-            )
+            CREATE TABLE IF NOT EXISTS seen_items (original_id TEXT PRIMARY KEY)
         """)
 
         conn.commit()
@@ -65,11 +207,7 @@ def init_databases():
         cursor = conn.cursor()
 
         cursor.execute("""
-            CREATE TABLE IF NOT EXISTS document_metadata (
-                paper_id TEXT PRIMARY KEY,
-                source_name TEXT,
-                paper_retrieval_time TEXT
-            )
+            CREATE TABLE IF NOT EXISTS document_metadata (paper_id TEXT PRIMARY KEY,source_name TEXT,paper_retrieval_time TEXT)
         """)
 
         conn.commit()
@@ -128,9 +266,7 @@ def mark_item_seen_and_save_metadata(original_id,paper_id,source_name):
 
         cursor.execute(
             """
-            INSERT OR IGNORE INTO seen_items
-            (original_id)
-            VALUES (?)
+            INSERT OR IGNORE INTO seen_items (original_id) VALUES (?)
             """,
             (original_id,)
         )
@@ -143,13 +279,7 @@ def mark_item_seen_and_save_metadata(original_id,paper_id,source_name):
 
         cursor.execute(
             """
-            INSERT OR IGNORE INTO document_metadata
-            (
-                paper_id,
-                source_name,
-                paper_retrieval_time
-            )
-            VALUES (?, ?, ?)
+            INSERT OR IGNORE INTO document_metadata (paper_id, source_name, paper_retrieval_time) VALUES (?, ?, ?)
             """,
             (
                 paper_id,

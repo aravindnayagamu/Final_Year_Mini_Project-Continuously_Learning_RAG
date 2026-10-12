@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-10-11T10:10:24.001872+00:00",
+  "methodology": {
+    "relevance": "Heuristic keyword-overlap proxy; a chunk is marked relevant when at least one meaningful query token overlaps.",
+    "precision@6": "Heuristic precision over the six returned results; not manually judged relevance.",
+    "recall@6": "Requires a set of known relevant chunk IDs. Remains null until ground truth is supplied.",
+    "contextual_precision": "Average precision calculated from the heuristic relevance labels and returned ranking.",
+    "recent_precision_and_historical_precision": "Heuristic topical relevance ratio within each database, not temporal classification accuracy."
+  },
+  "relevance": {
+    "total": 178,
+    "relevant": 57,
+    "relevance_score": 32.02,
+    "method": "heuristic_keyword_overlap"
+  },
+  "precision@6": {
+    "queries": 0,
+    "total": 0,
+    "relevant": 0,
+    "precision_score": null,
+    "method": "heuristic_keyword_overlap"
+  },
+  "recall@6": {
+    "queries": 44,
+    "evaluated_queries": 0,
+    "relevant_retrieved": 0,
+    "known_relevant": 0,
+    "recall_score": null,
+    "status": "Not evaluated: supply ground_truth_relevant_ids to update_metrics()."
+  },
+  "contextual_precision": {
+    "queries": 33,
+    "contextual_precision_score": 73.79,
+    "method": "heuristic_keyword_overlap"
+  },
+  "recent_precision": {
+    "total": 89,
+    "relevant": 16,
+    "precision_score": 17.98,
+    "method": "heuristic_keyword_overlap"
+  },
+  "historical_precision": {
+    "total": 89,
+    "relevant": 41,
+    "precision_score": 46.07,
+    "method": "heuristic_keyword_overlap"
+  },
+  "temporal_assignment": {
+    "verified": 89,
+    "correct": 89,
+    "accuracy_score": 100.0,
+    "unknown_timestamp_count": 89
+  },
+  "retrieval_latency_ms": {
+    "count": 44,
+    "last": 8.61,
+    "average": 13.65,
+    "total": 600.7
+  },
+  "chunks_retrieved": {
+    "total": 178,
+    "recent": 89,
+    "historical": 89,
+    "unknown_source": 0
+  },
+  "last_call": {
+    "query": "News and recent developments about Indian cricket",
+    "source": "historical",
+    "retrieved": 2,
+    "relevant_estimate": 1,
+    "relevance_score": 50.0,
+    "retrieval_time_ms": 8.61,
+    "relevance_method": "keyword_overlap_proxy"
+  }
+}

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import sqlite3
 import subprocess
 import sys
@@ -13,7 +14,7 @@ from typing import Optional
 from app.core.config import get_settings
 from app.db.session import AsyncSessionLocal
 from app.db.models import RunStatus, Document
-from app.services import metadata_service
+from app.services import metadata_service, pipeline_service
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -115,7 +116,7 @@ async def run_ingestion(triggered_by: str = "manual") -> int:
                     rt: Optional[datetime] = datetime.fromisoformat(row["retrieval_time_str"])
                 except (ValueError, TypeError):
                     rt = None
-                safe_source = row["source_name"].replace("/", "").replace("\\", "")
+                safe_source = re.sub(r'[\\/*?:"<>|]', "", row["source_name"])
                 pdf_name = f"{safe_source}_{row['paper_id']}.pdf"
                 is_read = (read_dir / pdf_name).exists()
                 status_val = "vectorized" if is_read else "pending"
@@ -149,6 +150,13 @@ async def run_ingestion(triggered_by: str = "manual") -> int:
                     doc.vectorization_status = "vectorized"
                     doc.vectorized_at = datetime.now(timezone.utc)
             await db.commit()
+
+        logger.info("Ingestion #%d | Step 4: Moving >24h chunks to historical store", run_id)
+        try:
+            sep = await loop.run_in_executor(None, pipeline_service.run_separation)
+            logger.info("Ingestion #%d | separation result: %s", run_id, sep)
+        except Exception as exc:
+            logger.warning("Ingestion #%d | separation step failed: %s", run_id, exc)
 
         status = RunStatus.completed.value
 

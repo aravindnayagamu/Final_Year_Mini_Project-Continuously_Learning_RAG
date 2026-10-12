@@ -11,7 +11,7 @@ from google import genai
 from app.core.config import get_settings
 from app.db.session import AsyncSessionLocal
 from app.schemas.query import QueryResponse, SourceChunk
-from app.services import cache_service, metadata_service
+from app.services import cache_service, metadata_service, pipeline_service
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -77,12 +77,20 @@ async def answer_question(question: str, k: int = 5) -> QueryResponse:
     sources: List[SourceChunk] = [
         SourceChunk(
             document=r["document"],
-            source=r["metadata"].get("source", "Unknown"),
+            source=(
+                r["metadata"].get("source_name")
+                or r["metadata"].get("source")
+                or "Unknown"
+            ),
             relevance=float(r["relevance"]),
             distance=float(r["distance"]),
+            news_type=r.get("news_type"),
+            retrieved_at=r["metadata"].get("paper_retrieval_time"),
         )
         for r in retrieved_docs
     ]
+
+    pipeline_service.record_query_metrics(question, retrieved_docs, retrieval_time_ms)
 
     if not merged_context:
         logger.warning("No relevant context found for question: %r", question[:80])

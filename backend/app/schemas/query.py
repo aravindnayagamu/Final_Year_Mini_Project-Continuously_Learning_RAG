@@ -15,6 +15,8 @@ class SourceChunk(BaseModel):
     source: str
     relevance: float
     distance: float
+    news_type: Optional[str] = None
+    retrieved_at: Optional[str] = None
 
 
 class QueryResponse(BaseModel):

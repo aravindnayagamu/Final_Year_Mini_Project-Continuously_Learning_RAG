@@ -113,42 +113,56 @@ async def run_ingestion(triggered_by: str = "manual") -> int:
         loop = asyncio.get_running_loop()
 
         logger.info("Ingestion #%d | Step 1: Running RSS fetch", run_id)
-        fetch_budget = max(30.0, total_budget * 0.35)
+        fetch_budget = min(45.0, total_budget * 0.15)
         await loop.run_in_executor(None, functools.partial(run_all_scrapers, fetch_budget))
         logger.info("Ingestion #%d | RSS fetch completed", run_id)
 
-        logger.info("Ingestion #%d | Step 2: Syncing SQLite → Postgres", run_id)
+        logger.info("Ingestion #%d | Step 2: Reconciling document metadata in Postgres", run_id)
         sqlite_path = settings.app_dir.parent / "metadata.db"
         all_rows = _read_new_sqlite_rows(sqlite_path)
         read_dir = settings.app_dir / "news_database" / "read"
 
         async with AsyncSessionLocal() as db:
-            for row in all_rows:
-                try:
-                    rt: Optional[datetime] = datetime.fromisoformat(row["retrieval_time_str"])
-                except (ValueError, TypeError):
-                    rt = None
-                safe_source = re.sub(r'[\\/*?:"<>|]', "", row["source_name"])
-                pdf_name = f"{safe_source}_{row['paper_id']}.pdf"
-                is_read = (read_dir / pdf_name).exists()
-                status_val = "vectorized" if is_read else "pending"
-                vectorized_at_val = datetime.now(timezone.utc) if is_read else None
-                await metadata_service.upsert_document(
-                    db=db,
-                    paper_id=row["paper_id"],
-                    source_name=row["source_name"],
-                    retrieval_time=rt,
-                    file_name=pdf_name,
-                    vectorization_status=status_val,
-                    vectorized_at=vectorized_at_val,
-                )
-            await db.commit()
+            from sqlalchemy import select, func
+            from sqlalchemy.dialects.postgresql import insert as pg_insert
+            existing_ids = set((await db.execute(select(Document.paper_id))).scalars().all())
+            new_rows = [r for r in all_rows if r["paper_id"] not in existing_ids]
 
-        state["fetched"] = len(all_rows)
-        logger.info("Ingestion #%d | Synced %d documents to Postgres", run_id, state["fetched"])
+            if new_rows:
+                read_files = {p.name for p in read_dir.glob("*.pdf")}
+                now_utc = datetime.now(timezone.utc)
+                records = []
+                for row in new_rows:
+                    try:
+                        rt: Optional[datetime] = datetime.fromisoformat(row["retrieval_time_str"])
+                    except (ValueError, TypeError):
+                        rt = None
+                    safe_source = re.sub(r'[\\/*?:"<>|]', "", row["source_name"])
+                    pdf_name = f"{safe_source}_{row['paper_id']}.pdf"
+                    is_read = pdf_name in read_files
+                    status_val = "vectorized" if is_read else "pending"
+                    vectorized_at_val = now_utc if is_read else None
+                    records.append({
+                        "paper_id": row["paper_id"],
+                        "source_name": row["source_name"],
+                        "retrieval_time": rt,
+                        "file_name": pdf_name,
+                        "vectorization_status": status_val,
+                        "vectorized_at": vectorized_at_val,
+                    })
+
+                for i in range(0, len(records), 500):
+                    batch = records[i:i+500]
+                    stmt = pg_insert(Document).values(batch).on_conflict_do_nothing()
+                    await db.execute(stmt)
+                await db.commit()
+
+            total_docs = await db.scalar(select(func.count(Document.paper_id)))
+            state["fetched"] = total_docs or len(all_rows)
+        logger.info("Ingestion #%d | Total %d documents in Postgres metadata", run_id, state["fetched"])
 
         logger.info("Ingestion #%d | Step 3: Running vectorizer", run_id)
-        vectorize_budget = max(30.0, remaining() - 90.0)
+        vectorize_budget = min(60.0, max(30.0, remaining() - 30.0))
         state["vectorized"] = await loop.run_in_executor(
             None, functools.partial(_run_vectorizer, vectorize_budget)
         )
@@ -160,11 +174,17 @@ async def run_ingestion(triggered_by: str = "manual") -> int:
                     select(Document).where(Document.vectorization_status == "pending")
                 )
             ).scalars().all()
-            for doc in pending_docs:
-                if doc.file_name and (read_dir / doc.file_name).exists():
-                    doc.vectorization_status = "vectorized"
-                    doc.vectorized_at = datetime.now(timezone.utc)
-            await db.commit()
+            if pending_docs:
+                read_files = {p.name for p in read_dir.glob("*.pdf")}
+                now_utc = datetime.now(timezone.utc)
+                updated = False
+                for doc in pending_docs:
+                    if doc.file_name and doc.file_name in read_files:
+                        doc.vectorization_status = "vectorized"
+                        doc.vectorized_at = now_utc
+                        updated = True
+                if updated:
+                    await db.commit()
 
         logger.info("Ingestion #%d | Step 4: Moving >24h chunks to historical store", run_id)
         try:

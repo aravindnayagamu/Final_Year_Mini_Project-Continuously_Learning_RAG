@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import json
 import re
 import threading
@@ -286,6 +287,24 @@ def _lookup_timestamp(metadata: dict[str, Any]) -> str | None:
         paper_id = Path(str(source)).stem.rsplit("_", 1)[-1]
     if not paper_id:
         return None
+
+    db_url = os.getenv("DATABASE_URL", "")
+    if db_url:
+        try:
+            import psycopg2
+            sync_url = db_url.replace("+asyncpg", "")
+            with psycopg2.connect(sync_url) as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "SELECT retrieval_time FROM documents WHERE paper_id = %s",
+                        (paper_id,)
+                    )
+                    row = cur.fetchone()
+                    if row and row[0]:
+                        return row[0].isoformat() if hasattr(row[0], "isoformat") else str(row[0])
+        except Exception:
+            pass
+
     db_paths = [
         Path(__file__).resolve().parent.parent / "metadata.db",
         Path(__file__).resolve().parent / "metadata.db",

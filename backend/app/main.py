@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
+import uvicorn
 
 from app.core.config import get_settings
 from app.core.logging import setup_logging
@@ -74,3 +75,7 @@ app.include_router(research.router, prefix=PREFIX)
 app.include_router(pipeline.router, prefix=PREFIX)
 
 logger.debug("All routers registered under %s", PREFIX)
+
+
+if __name__ == "__main__":
+    uvicorn.run("app.main:app", host="127.0.0.1", port=8000, reload=True)

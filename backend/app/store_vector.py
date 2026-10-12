@@ -1,4 +1,5 @@
 import os
+import time
 from pypdf import PdfReader
 from pathlib import Path
 import shutil
@@ -94,7 +95,14 @@ def process_unread_files():
     unread_dir.mkdir(parents=True, exist_ok=True)
     read_dir.mkdir(parents=True, exist_ok=True)
 
+    deadline_raw = os.getenv("INGEST_VECTORIZE_DEADLINE")
+    deadline = float(deadline_raw) if deadline_raw else None
+
     for file in list(unread_dir.iterdir()):
+        if deadline is not None and time.time() >= deadline:
+            print("Time budget reached; remaining files will be processed in the next run.")
+            break
+
         if file.suffix.lower() != ".pdf":
             continue
 

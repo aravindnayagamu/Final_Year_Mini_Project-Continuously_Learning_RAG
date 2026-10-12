@@ -755,24 +755,28 @@ def process_rss_feed(source_config):
     )
 
 
-def run_all_scrapers():
+def run_all_scrapers(timeout=None):
     logging.info(
         "\n"
         "Starting multi-source news ingestion\n"
     )
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=min(24, len(RSS_SOURCES))) as executor:
-        futures = []
-        for source in RSS_SOURCES:
-            future = executor.submit(process_rss_feed, source)
-            futures.append(future)
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=min(24, len(RSS_SOURCES)))
+    futures = [executor.submit(process_rss_feed, source) for source in RSS_SOURCES]
 
-        for future in futures:
-            try:
-                future.result()
+    done, not_done = concurrent.futures.wait(futures, timeout=timeout)
 
-            except Exception as e:
-                logging.error(f"Worker thread failed: {e}")
+    for future in done:
+        try:
+            future.result()
+
+        except Exception as e:
+            logging.error(f"Worker thread failed: {e}")
+
+    if not_done:
+        logging.warning(f"Fetch time budget reached; abandoning {len(not_done)} unfinished feeds")
+
+    executor.shutdown(wait=False, cancel_futures=True)
 
     logging.info("All ingestion threads completed\n")
 

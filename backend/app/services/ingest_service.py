@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import functools
+import os
 import logging
 import re
 import sqlite3
@@ -53,19 +55,22 @@ def _read_new_sqlite_rows(sqlite_path: Path) -> list[dict]:
     return rows
 
 
-def _run_vectorizer() -> int:
+def _run_vectorizer(budget_seconds: float) -> int:
     script = settings.app_dir / "store_vector.py"
     if not script.exists():
         logger.error("store_vector.py not found at %s", script)
         return 0
-    logger.info("Launching store_vector.py subprocess")
+    logger.info("Launching store_vector.py subprocess | budget=%.0fs", budget_seconds)
     t0 = time.perf_counter()
+    env = os.environ.copy()
+    env["INGEST_VECTORIZE_DEADLINE"] = str(time.time() + budget_seconds)
     try:
         result = subprocess.run(
             [sys.executable, str(script)],
             capture_output=True,
             text=True,
-            timeout=settings.ingest_timeout_seconds,
+            timeout=budget_seconds + 30,
+            env=env,
         )
         elapsed = time.perf_counter() - t0
         if result.returncode != 0:
@@ -77,7 +82,7 @@ def _run_vectorizer() -> int:
                     elapsed, embedded_count)
         return embedded_count
     except subprocess.TimeoutExpired:
-        logger.error("store_vector.py timed out after %ds", settings.ingest_timeout_seconds)
+        logger.error("store_vector.py timed out after %.0fs", budget_seconds + 30)
         return 0
     except Exception as exc:
         logger.exception("Unexpected error running store_vector.py: %s", exc)
@@ -85,24 +90,31 @@ def _run_vectorizer() -> int:
 
 
 async def run_ingestion(triggered_by: str = "manual") -> int:
+    total_budget = float(settings.ingest_timeout_seconds)
+
     async with AsyncSessionLocal() as db:
+        await metadata_service.fail_stale_ingestion_runs(db, int(total_budget) + 60)
         run = await metadata_service.create_ingestion_run(db, triggered_by=triggered_by)
         run_id = run.id
         await db.commit()
 
-    logger.info("Ingestion #%d started | triggered_by=%s", run_id, triggered_by)
-    articles_fetched = 0
-    articles_vectorized = 0
+    logger.info("Ingestion #%d started | triggered_by=%s | budget=%.0fs", run_id, triggered_by, total_budget)
+    state = {"fetched": 0, "vectorized": 0}
     error_msg: Optional[str] = None
     t0 = time.perf_counter()
 
-    try:
+    def remaining() -> float:
+        return total_budget - (time.perf_counter() - t0)
+
+    async def _pipeline() -> None:
         if not _fetcher_available:
             raise RuntimeError("fetch_news module not available")
 
+        loop = asyncio.get_running_loop()
+
         logger.info("Ingestion #%d | Step 1: Running RSS fetch", run_id)
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, run_all_scrapers)
+        fetch_budget = max(30.0, total_budget * 0.35)
+        await loop.run_in_executor(None, functools.partial(run_all_scrapers, fetch_budget))
         logger.info("Ingestion #%d | RSS fetch completed", run_id)
 
         logger.info("Ingestion #%d | Step 2: Syncing SQLite → Postgres", run_id)
@@ -132,11 +144,14 @@ async def run_ingestion(triggered_by: str = "manual") -> int:
                 )
             await db.commit()
 
-        articles_fetched = len(all_rows)
-        logger.info("Ingestion #%d | Synced %d documents to Postgres", run_id, articles_fetched)
+        state["fetched"] = len(all_rows)
+        logger.info("Ingestion #%d | Synced %d documents to Postgres", run_id, state["fetched"])
 
         logger.info("Ingestion #%d | Step 3: Running vectorizer", run_id)
-        articles_vectorized = await loop.run_in_executor(None, _run_vectorizer)
+        vectorize_budget = max(30.0, remaining() - 90.0)
+        state["vectorized"] = await loop.run_in_executor(
+            None, functools.partial(_run_vectorizer, vectorize_budget)
+        )
 
         async with AsyncSessionLocal() as db:
             from sqlalchemy import select
@@ -158,12 +173,22 @@ async def run_ingestion(triggered_by: str = "manual") -> int:
         except Exception as exc:
             logger.warning("Ingestion #%d | separation step failed: %s", run_id, exc)
 
+    try:
+        await asyncio.wait_for(_pipeline(), timeout=total_budget)
         status = RunStatus.completed.value
+
+    except asyncio.TimeoutError:
+        logger.error("Ingestion #%d exceeded %.0fs limit", run_id, total_budget)
+        error_msg = f"Run exceeded the {int(total_budget)}s time limit."
+        status = RunStatus.failed.value
 
     except Exception as exc:
         logger.exception("Ingestion #%d failed: %s", run_id, exc)
         error_msg = str(exc)
         status = RunStatus.failed.value
+
+    articles_fetched = state["fetched"]
+    articles_vectorized = state["vectorized"]
 
     elapsed = time.perf_counter() - t0
     async with AsyncSessionLocal() as db:

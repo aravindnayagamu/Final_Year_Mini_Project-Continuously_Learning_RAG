@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Tuple
 
 from sqlalchemy import case, func, select, update
@@ -146,6 +146,25 @@ async def create_ingestion_run(
     await db.refresh(run)
     logger.info("Ingestion run created id=%d triggered_by=%s", run.id, triggered_by)
     return run
+
+
+async def fail_stale_ingestion_runs(db: AsyncSession, max_age_seconds: int) -> int:
+    cutoff = datetime.now(timezone.utc) - timedelta(seconds=max_age_seconds)
+    result = await db.execute(
+        update(IngestionRun)
+        .where(IngestionRun.status == RunStatus.running.value)
+        .where(IngestionRun.started_at < cutoff)
+        .values(
+            status=RunStatus.failed.value,
+            completed_at=datetime.now(timezone.utc),
+            error_message="Run was interrupted or exceeded the time limit.",
+        )
+    )
+    await db.flush()
+    count = result.rowcount or 0
+    if count:
+        logger.warning("Marked %d stale ingestion run(s) as failed", count)
+    return count
 
 
 async def update_ingestion_run(

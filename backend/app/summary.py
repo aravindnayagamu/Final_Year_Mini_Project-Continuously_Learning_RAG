@@ -349,13 +349,9 @@ def create_summary():
     
     print("Retrieving personalized news...")
 
-    recent_category_documents["PERSONALIZED NEWS FOR YOU"] = (
-        retrieve_personalized_news(recent_store, k=5,source="recent")
-    )
+    recent_category_documents["PERSONALIZED NEWS FOR YOU"] = (retrieve_personalized_news(recent_store, k=5,source="recent"))
 
-    historical_category_documents["PERSONALIZED NEWS FOR YOU"] = (
-        retrieve_personalized_news(historical_store, k=5,source="historical")
-    )
+    historical_category_documents["PERSONALIZED NEWS FOR YOU"] = (retrieve_personalized_news(historical_store, k=5,source="historical"))
 
     for category in recent_category_documents:
         recent_category_documents[category] = remove_duplicates(recent_category_documents[category])

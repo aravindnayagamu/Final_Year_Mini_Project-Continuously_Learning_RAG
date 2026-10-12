@@ -65,7 +65,7 @@ def _run_vectorizer() -> int:
             [sys.executable, str(script)],
             capture_output=True,
             text=True,
-            timeout=300,
+            timeout=settings.ingest_timeout_seconds,
         )
         elapsed = time.perf_counter() - t0
         if result.returncode != 0:
@@ -77,7 +77,7 @@ def _run_vectorizer() -> int:
                     elapsed, embedded_count)
         return embedded_count
     except subprocess.TimeoutExpired:
-        logger.error("store_vector.py timed out after 300s")
+        logger.error("store_vector.py timed out after %ds", settings.ingest_timeout_seconds)
         return 0
     except Exception as exc:
         logger.exception("Unexpected error running store_vector.py: %s", exc)

@@ -45,10 +45,6 @@ RSS_SOURCES = [
         "url": "https://timesofindia.indiatimes.com/rssfeedstopstories.cms"
     },
     {
-        "source_name": "TOI_Most_Recent",
-        "url": "http://timesofindia.indiatimes.com/rssfeedmostrecent.cms"
-    },
-    {
         "source_name": "TOI_India",
         "url": "http://timesofindia.indiatimes.com/rssfeeds/-2128936835.cms"
     },
@@ -57,16 +53,8 @@ RSS_SOURCES = [
         "url": "http://timesofindia.indiatimes.com/rssfeeds/296589292.cms"
     },
     {
-        "source_name": "TOI_NRI",
-        "url": "http://timesofindia.indiatimes.com/rssfeeds/7098551.cms"
-    },
-    {
         "source_name": "TOI_Business",
         "url": "http://timesofindia.indiatimes.com/rssfeeds/1898055.cms"
-    },
-    {
-        "source_name": "TOI_US",
-        "url": "https://timesofindia.indiatimes.com/rssfeeds_us/72258322.cms"
     },
     {
         "source_name": "TOI_Cricket",
@@ -77,64 +65,20 @@ RSS_SOURCES = [
         "url": "http://timesofindia.indiatimes.com/rssfeeds/4719148.cms"
     },
     {
-        "source_name": "TOI_Science",
-        "url": "http://timesofindia.indiatimes.com/rssfeeds/-2128672765.cms"
-    },
-    {
-        "source_name": "TOI_Environment",
-        "url": "http://timesofindia.indiatimes.com/rssfeeds/2647163.cms"
-    },
-    {
         "source_name": "TOI_Tech",
         "url": "http://timesofindia.indiatimes.com/rssfeeds/66949542.cms"
-    },
-    {
-        "source_name": "TOI_Education",
-        "url": "http://timesofindia.indiatimes.com/rssfeeds/913168846.cms"
     },
     {
         "source_name": "TOI_Entertainment",
         "url": "http://timesofindia.indiatimes.com/rssfeeds/1081479906.cms"
     },
     {
-        "source_name": "TOI_LifeStyle",
-        "url": "http://timesofindia.indiatimes.com/rssfeeds/2886704.cms"
-    },
-    {
-        "source_name": "TOI_Astrology",
-        "url": "https://timesofindia.indiatimes.com/rssfeeds/65857041.cms"
-    },
-    {
-        "source_name": "TOI_Automobiles",
-        "url": "https://timesofindia.indiatimes.com/rssfeeds/74317216.cms"
-    },
-    {
-        "source_name": "TOI_Mumbai",
-        "url": "http://timesofindia.indiatimes.com/rssfeeds/-2128838597.cms"
-    },
-    {
-        "source_name": "TOI_Delhi",
-        "url": "http://timesofindia.indiatimes.com/rssfeeds/-2128839596.cms"
-    },
-    {
         "source_name": "TOI_Chennai",
         "url": "http://timesofindia.indiatimes.com/rssfeeds/2950623.cms"
     },
     {
-        "source_name": "TOI_Kolkata",
-        "url": "http://timesofindia.indiatimes.com/rssfeeds/-2128830821.cms"
-    },
-    {
         "source_name": "NDTV_Top_Stories",
         "url": "https://feeds.feedburner.com/ndtvnews-top-stories"
-    },
-    {
-        "source_name": "NDTV_Latest_Stories",
-        "url": "https://feeds.feedburner.com/ndtvnews-latest"
-    },
-    {
-        "source_name": "NDTV_Trending_Stories",
-        "url": "https://feeds.feedburner.com/ndtvnews-trending-news"
     },
     {
         "source_name": "NDTV_India",
@@ -161,40 +105,424 @@ RSS_SOURCES = [
         "url": "https://feeds.feedburner.com/ndtvsports-cricket"
     },
     {
-        "source_name": "NDTV_Tech",
-        "url": "https://feeds.feedburner.com/gadgets360-latest"
-    },
-    {
-        "source_name": "NDTV_Automobiles",
-        "url": "https://feeds.feedburner.com/carandbike-latest"
-    },
-    {
-        "source_name": "NDTV_Cities",
-        "url": "https://feeds.feedburner.com/ndtvnews-cities-news"
-    },
-    {
         "source_name": "NDTV_South",
         "url": "https://feeds.feedburner.com/ndtvnews-south"
     },
     {
-        "source_name": "NDTV_NRI",
-        "url": "https://feeds.feedburner.com/ndtvnews-indians-abroad"
-    },
-    {
-        "source_name": "NDTV_Health",
-        "url": "https://feeds.feedburner.com/ndtvcooks-latest"
-    },
-    {
-        "source_name": "NDTV_Offbeat",
-        "url": "https://feeds.feedburner.com/ndtvnews-offbeat-news"
-    },
-    {
-        "source_name": "NDTV_People",
-        "url": "https://feeds.feedburner.com/ndtvnews-people"
-    },
-    {
         "source_name": "PIB_India",
         "url": "https://pib.gov.in/RssMain.aspx?ModId=6&Lang=1&Regid=3"
+    },
+    {
+        "source_name": "Hindu_India",
+        "url": "https://www.thehindu.com/news/national/feeder/default.rss"
+    },
+    {
+        "source_name": "Hindu_World",
+        "url": "https://www.thehindu.com/news/international/feeder/default.rss"
+    },
+    {
+        "source_name": "Hindu_Business",
+        "url": "https://www.thehindu.com/business/feeder/default.rss"
+    },
+    {
+        "source_name": "Hindu_Sport",
+        "url": "https://www.thehindu.com/sport/feeder/default.rss"
+    },
+    {
+        "source_name": "Hindu_Movies",
+        "url": "https://www.thehindu.com/entertainment/movies/feeder/default.rss"
+    },
+    {
+        "source_name": "Hindu_TamilNadu",
+        "url": "https://www.thehindu.com/news/national/tamil-nadu/feeder/default.rss"
+    },
+    {
+        "source_name": "Hindu_Chennai",
+        "url": "https://www.thehindu.com/news/cities/chennai/feeder/default.rss"
+    },
+    {
+        "source_name": "IE_India",
+        "url": "https://indianexpress.com/section/india/feed/"
+    },
+    {
+        "source_name": "IE_World",
+        "url": "https://indianexpress.com/section/world/feed/"
+    },
+    {
+        "source_name": "IE_Business",
+        "url": "https://indianexpress.com/section/business/feed/"
+    },
+    {
+        "source_name": "IE_Sports",
+        "url": "https://indianexpress.com/section/sports/feed/"
+    },
+    {
+        "source_name": "IE_Tamil_Cinema",
+        "url": "https://indianexpress.com/section/entertainment/tamil/feed/"
+    },
+    {
+        "source_name": "IE_Political",
+        "url": "https://indianexpress.com/section/political-pulse/feed/"
+    },
+    {
+        "source_name": "IE_Chennai",
+        "url": "https://indianexpress.com/section/cities/chennai/feed/"
+    },
+    {
+        "source_name": "HT_India",
+        "url": "https://www.hindustantimes.com/feeds/rss/india-news/rssfeed.xml"
+    },
+    {
+        "source_name": "HT_World",
+        "url": "https://www.hindustantimes.com/feeds/rss/world-news/rssfeed.xml"
+    },
+    {
+        "source_name": "HT_Business",
+        "url": "https://www.hindustantimes.com/feeds/rss/business/rssfeed.xml"
+    },
+    {
+        "source_name": "HT_Cricket",
+        "url": "https://www.hindustantimes.com/feeds/rss/cricket/rssfeed.xml"
+    },
+    {
+        "source_name": "HT_Cinema",
+        "url": "https://www.hindustantimes.com/feeds/rss/entertainment/tamil-cinema/rssfeed.xml"
+    },
+    {
+        "source_name": "IndiaToday_India",
+        "url": "https://www.indiatoday.in/rss/1206578"
+    },
+    {
+        "source_name": "IndiaToday_World",
+        "url": "https://www.indiatoday.in/rss/1206577"
+    },
+    {
+        "source_name": "IndiaToday_Business",
+        "url": "https://www.indiatoday.in/rss/1206513"
+    },
+    {
+        "source_name": "IndiaToday_Sports",
+        "url": "https://www.indiatoday.in/rss/1206550"
+    },
+    {
+        "source_name": "IndiaToday_Politics",
+        "url": "https://www.indiatoday.in/rss/1206575"
+    },
+    {
+        "source_name": "News18_Top",
+        "url": "https://www.news18.com/commonfeeds/v1/eng/rss/india.xml"
+    },
+    {
+        "source_name": "News18_World",
+        "url": "https://www.news18.com/commonfeeds/v1/eng/rss/world.xml"
+    },
+    {
+        "source_name": "News18_Business",
+        "url": "https://www.news18.com/commonfeeds/v1/eng/rss/business.xml"
+    },
+    {
+        "source_name": "News18_Sports",
+        "url": "https://www.news18.com/commonfeeds/v1/eng/rss/sports.xml"
+    },
+    {
+        "source_name": "News18_Tamil",
+        "url": "https://tamil.news18.com/commonfeeds/v1/tam/rss/tamil-nadu.xml"
+    },
+    {
+        "source_name": "News18_Tamil_Cinema",
+        "url": "https://tamil.news18.com/commonfeeds/v1/tam/rss/entertainment.xml"
+    },
+    {
+        "source_name": "Firstpost_Top",
+        "url": "https://www.firstpost.com/commonfeeds/v1/mfp/rss/india.xml"
+    },
+    {
+        "source_name": "Firstpost_Entertainment",
+        "url": "https://www.firstpost.com/commonfeeds/v1/mfp/rss/entertainment.xml"
+    },
+    {
+        "source_name": "Scroll_Top",
+        "url": "https://feeds.feedburner.com/ScrollinArticles.rss"
+    },
+    {
+        "source_name": "DeccanChronicle_Top",
+        "url": "https://www.deccanchronicle.com/rss_feed/"
+    },
+    {
+        "source_name": "LiveMint_Top",
+        "url": "https://www.livemint.com/rss/news"
+    },
+    {
+        "source_name": "LiveMint_Markets",
+        "url": "https://www.livemint.com/rss/markets"
+    },
+    {
+        "source_name": "EconomicTimes_Top",
+        "url": "https://economictimes.indiatimes.com/rssfeedstopstories.cms"
+    },
+    {
+        "source_name": "EconomicTimes_Markets",
+        "url": "https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms"
+    },
+    {
+        "source_name": "EconomicTimes_Economy",
+        "url": "https://economictimes.indiatimes.com/news/economy/rssfeeds/1373380680.cms"
+    },
+    {
+        "source_name": "BusinessStandard_Top",
+        "url": "https://www.business-standard.com/rss/home_page_top_stories.rss"
+    },
+    {
+        "source_name": "BusinessStandard_Markets",
+        "url": "https://www.business-standard.com/rss/markets-106.rss"
+    },
+    {
+        "source_name": "MoneyControl_Top",
+        "url": "https://www.moneycontrol.com/rss/latestnews.xml"
+    },
+    {
+        "source_name": "MoneyControl_Markets",
+        "url": "https://www.moneycontrol.com/rss/marketreports.xml"
+    },
+    {
+        "source_name": "ABPLive_Top",
+        "url": "https://news.abplive.com/home/feed"
+    },
+    {
+        "source_name": "ABPLive_Entertainment",
+        "url": "https://news.abplive.com/entertainment/feed"
+    },
+    {
+        "source_name": "ABPLive_Sports",
+        "url": "https://news.abplive.com/sports/feed"
+    },
+    {
+        "source_name": "OneIndia_Top",
+        "url": "https://www.oneindia.com/rss/news-fb.xml"
+    },
+    {
+        "source_name": "OneIndia_Tamil",
+        "url": "https://tamil.oneindia.com/rss/tamil-news-fb.xml"
+    },
+    {
+        "source_name": "BollywoodHungama",
+        "url": "https://www.bollywoodhungama.com/rss/news.xml"
+    },
+    {
+        "source_name": "Vikatan_Cinema",
+        "url": "https://www.vikatan.com/api/v1/collections/cinema.rss"
+    },
+    {
+        "source_name": "Vikatan_Top",
+        "url": "https://www.vikatan.com/api/v1/collections/latest-news.rss"
+    },
+    {
+        "source_name": "TamilHindu",
+        "url": "https://www.hindutamil.in/feed"
+    },
+    {
+        "source_name": "ESPNcricinfo_Top",
+        "url": "https://www.espncricinfo.com/rss/content/story/feeds/0.xml"
+    },
+    {
+        "source_name": "Sportstar_Top",
+        "url": "https://sportstar.thehindu.com/feeder/default.rss"
+    },
+    {
+        "source_name": "Sportstar_Football",
+        "url": "https://sportstar.thehindu.com/football/feeder/default.rss"
+    },
+    {
+        "source_name": "BBC_Sport",
+        "url": "https://feeds.bbci.co.uk/sport/rss.xml"
+    },
+    {
+        "source_name": "BBC_Cricket",
+        "url": "https://feeds.bbci.co.uk/sport/cricket/rss.xml"
+    },
+    {
+        "source_name": "BBC_Top",
+        "url": "https://feeds.bbci.co.uk/news/rss.xml"
+    },
+    {
+        "source_name": "BBC_World",
+        "url": "https://feeds.bbci.co.uk/news/world/rss.xml"
+    },
+    {
+        "source_name": "BBC_India",
+        "url": "https://feeds.bbci.co.uk/news/world/asia/india/rss.xml"
+    },
+    {
+        "source_name": "BBC_Business",
+        "url": "https://feeds.bbci.co.uk/news/business/rss.xml"
+    },
+    {
+        "source_name": "BBC_Tech",
+        "url": "https://feeds.bbci.co.uk/news/technology/rss.xml"
+    },
+    {
+        "source_name": "BBC_Entertainment",
+        "url": "https://feeds.bbci.co.uk/news/entertainment_and_arts/rss.xml"
+    },
+    {
+        "source_name": "AlJazeera_All",
+        "url": "https://www.aljazeera.com/xml/rss/all.xml"
+    },
+    {
+        "source_name": "Guardian_World",
+        "url": "https://www.theguardian.com/world/rss"
+    },
+    {
+        "source_name": "Guardian_India",
+        "url": "https://www.theguardian.com/world/india/rss"
+    },
+    {
+        "source_name": "Guardian_Business",
+        "url": "https://www.theguardian.com/uk/business/rss"
+    },
+    {
+        "source_name": "Guardian_Sport",
+        "url": "https://www.theguardian.com/uk/sport/rss"
+    },
+    {
+        "source_name": "NYT_World",
+        "url": "https://rss.nytimes.com/services/xml/rss/nyt/World.xml"
+    },
+    {
+        "source_name": "NYT_Business",
+        "url": "https://rss.nytimes.com/services/xml/rss/nyt/Business.xml"
+    },
+    {
+        "source_name": "NYT_Tech",
+        "url": "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml"
+    },
+    {
+        "source_name": "NYT_Arts",
+        "url": "https://rss.nytimes.com/services/xml/rss/nyt/Arts.xml"
+    },
+    {
+        "source_name": "CNN_Top",
+        "url": "http://rss.cnn.com/rss/edition.rss"
+    },
+    {
+        "source_name": "CNN_Business",
+        "url": "http://rss.cnn.com/rss/money_latest.rss"
+    },
+    {
+        "source_name": "CNN_Entertainment",
+        "url": "http://rss.cnn.com/rss/edition_entertainment.rss"
+    },
+    {
+        "source_name": "DW_Top",
+        "url": "https://rss.dw.com/rdf/rss-en-all"
+    },
+    {
+        "source_name": "France24_Top",
+        "url": "https://www.france24.com/en/rss"
+    },
+    {
+        "source_name": "SkyNews_World",
+        "url": "https://feeds.skynews.com/feeds/rss/world.xml"
+    },
+    {
+        "source_name": "NPR_News",
+        "url": "https://feeds.npr.org/1001/rss.xml"
+    },
+    {
+        "source_name": "NPR_World",
+        "url": "https://feeds.npr.org/1004/rss.xml"
+    },
+    {
+        "source_name": "CNBC_Top",
+        "url": "https://www.cnbc.com/id/100003114/device/rss/rss.html"
+    },
+    {
+        "source_name": "CNBC_Markets",
+        "url": "https://www.cnbc.com/id/20910258/device/rss/rss.html"
+    },
+    {
+        "source_name": "WSJ_World",
+        "url": "https://feeds.a.dj.com/rss/RSSWorldNews.xml"
+    },
+    {
+        "source_name": "WSJ_Markets",
+        "url": "https://feeds.a.dj.com/rss/RSSMarketsMain.xml"
+    },
+    {
+        "source_name": "Bloomberg_Markets",
+        "url": "https://feeds.bloomberg.com/markets/news.rss"
+    },
+    {
+        "source_name": "Economist_World",
+        "url": "https://www.economist.com/the-world-this-week/rss.xml"
+    },
+    {
+        "source_name": "StraitsTimes_Asia",
+        "url": "https://www.straitstimes.com/news/asia/rss.xml"
+    },
+    {
+        "source_name": "ChannelNewsAsia",
+        "url": "https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml"
+    },
+    {
+        "source_name": "ScmpAsia",
+        "url": "https://www.scmp.com/rss/91/feed"
+    },
+    {
+        "source_name": "Dawn_Top",
+        "url": "https://www.dawn.com/feeds/home"
+    },
+    {
+        "source_name": "TheDiplomat_SouthAsia",
+        "url": "https://thediplomat.com/regions/south-asia/feed/"
+    },
+    {
+        "source_name": "Variety",
+        "url": "https://variety.com/feed/"
+    },
+    {
+        "source_name": "HollywoodReporter",
+        "url": "https://www.hollywoodreporter.com/feed/"
+    },
+    {
+        "source_name": "TheVerge",
+        "url": "https://www.theverge.com/rss/index.xml"
+    },
+    {
+        "source_name": "TechCrunch",
+        "url": "https://techcrunch.com/feed/"
+    },
+    {
+        "source_name": "Wired",
+        "url": "https://www.wired.com/feed/rss"
+    },
+    {
+        "source_name": "ArsTechnica",
+        "url": "https://feeds.arstechnica.com/arstechnica/index"
+    },
+    {
+        "source_name": "YourStory",
+        "url": "https://yourstory.com/feed"
+    },
+    {
+        "source_name": "ScienceDaily",
+        "url": "https://www.sciencedaily.com/rss/all.xml"
+    },
+    {
+        "source_name": "NASA",
+        "url": "https://www.nasa.gov/rss/dyn/breaking_news.rss"
+    },
+    {
+        "source_name": "WHO_News",
+        "url": "https://www.who.int/rss-feeds/news-english.xml"
+    },
+    {
+        "source_name": "RBI_PressReleases",
+        "url": "https://rbi.org.in/pressreleases_rss.xml"
+    },
+    {
+        "source_name": "SEBI",
+        "url": "https://www.sebi.gov.in/sebirss.xml"
     }
 ]
 
@@ -433,7 +761,7 @@ def run_all_scrapers():
         "Starting multi-source news ingestion\n"
     )
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=len(RSS_SOURCES)) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(24, len(RSS_SOURCES))) as executor:
         futures = []
         for source in RSS_SOURCES:
             future = executor.submit(process_rss_feed, source)

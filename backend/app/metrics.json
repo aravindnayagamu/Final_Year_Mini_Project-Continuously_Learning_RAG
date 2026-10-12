@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-10-11T10:10:24.001872+00:00",
+  "updated_at": "2026-10-12T10:49:01.483785+00:00",
   "methodology": {
     "relevance": "Heuristic keyword-overlap proxy; a chunk is marked relevant when at least one meaningful query token overlaps.",
     "precision@6": "Heuristic precision over the six returned results; not manually judged relevance.",
@@ -9,20 +9,20 @@
     "recent_precision_and_historical_precision": "Heuristic topical relevance ratio within each database, not temporal classification accuracy."
   },
   "relevance": {
-    "total": 178,
-    "relevant": 57,
-    "relevance_score": 32.02,
+    "total": 308,
+    "relevant": 120,
+    "relevance_score": 38.96,
     "method": "heuristic_keyword_overlap"
   },
   "precision@6": {
-    "queries": 0,
-    "total": 0,
-    "relevant": 0,
-    "precision_score": null,
+    "queries": 13,
+    "total": 78,
+    "relevant": 45,
+    "precision_score": 57.69,
     "method": "heuristic_keyword_overlap"
   },
   "recall@6": {
-    "queries": 44,
+    "queries": 57,
     "evaluated_queries": 0,
     "relevant_retrieved": 0,
     "known_relevant": 0,
@@ -30,47 +30,47 @@
     "status": "Not evaluated: supply ground_truth_relevant_ids to update_metrics()."
   },
   "contextual_precision": {
-    "queries": 33,
-    "contextual_precision_score": 73.79,
+    "queries": 42,
+    "contextual_precision_score": 77.19,
     "method": "heuristic_keyword_overlap"
   },
   "recent_precision": {
-    "total": 89,
-    "relevant": 16,
-    "precision_score": 17.98,
+    "total": 154,
+    "relevant": 55,
+    "precision_score": 35.71,
     "method": "heuristic_keyword_overlap"
   },
   "historical_precision": {
-    "total": 89,
-    "relevant": 41,
-    "precision_score": 46.07,
+    "total": 154,
+    "relevant": 65,
+    "precision_score": 42.21,
     "method": "heuristic_keyword_overlap"
   },
   "temporal_assignment": {
-    "verified": 89,
-    "correct": 89,
+    "verified": 186,
+    "correct": 186,
     "accuracy_score": 100.0,
-    "unknown_timestamp_count": 89
+    "unknown_timestamp_count": 122
   },
   "retrieval_latency_ms": {
-    "count": 44,
-    "last": 8.61,
-    "average": 13.65,
-    "total": 600.7
+    "count": 57,
+    "last": 595.5,
+    "average": 153.26,
+    "total": 8736.0
   },
   "chunks_retrieved": {
-    "total": 178,
-    "recent": 89,
-    "historical": 89,
+    "total": 308,
+    "recent": 154,
+    "historical": 154,
     "unknown_source": 0
   },
   "last_call": {
-    "query": "News and recent developments about Indian cricket",
-    "source": "historical",
-    "retrieved": 2,
-    "relevant_estimate": 1,
-    "relevance_score": 50.0,
-    "retrieval_time_ms": 8.61,
+    "query": "CJP protest news",
+    "source": "unknown",
+    "retrieved": 10,
+    "relevant_estimate": 10,
+    "relevance_score": 100.0,
+    "retrieval_time_ms": 595.5,
     "relevance_method": "keyword_overlap_proxy"
   }
 }

@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     query_rate_limit: str = "5/minute"
     ingest_rate_limit: str = "2/minute"
     cache_ttl_seconds: int = 3600
+    ingest_timeout_seconds: int = 3600
 
     app_dir: Path = Path(__file__).resolve().parents[1]
 

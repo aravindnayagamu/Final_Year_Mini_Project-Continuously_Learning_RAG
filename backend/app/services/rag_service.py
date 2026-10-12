@@ -41,6 +41,31 @@ def _get_gemini_client() -> genai.Client:
     return _gemini_client
 
 
+def _is_unavailable_response(answer: str, context_chunks: int, sources: list) -> bool:
+    if context_chunks == 0 or not sources:
+        return True
+    lower = answer.lower().strip()
+    negative_phrases = (
+        "chunk not available",
+        "chunks not available",
+        "no chunk available",
+        "no chunks available",
+        "no chunks found",
+        "could not find the answer in the retrieved documents",
+        "cannot find the answer in the retrieved documents",
+        "not found in the retrieved documents",
+        "not found in the context",
+        "not available in the retrieved",
+        "not available in the context",
+        "no relevant information found",
+        "no relevant news found",
+        "no relevant context found",
+        "information is not available",
+        "information not available",
+    )
+    return any(phrase in lower for phrase in negative_phrases)
+
+
 async def answer_question(question: str, k: int = 5) -> QueryResponse:
     if not _rag_available:
         raise RuntimeError(
@@ -51,16 +76,23 @@ async def answer_question(question: str, k: int = 5) -> QueryResponse:
     cache_key = cache_service.build_cache_key("rag_query", question, k)
     cached = await cache_service.get_cached_json(cache_key)
     if cached:
-        logger.info("Cache hit for question=%r", question[:80])
-        return QueryResponse(
-            question=cached["question"],
-            answer=cached["answer"],
-            sources=[SourceChunk(**s) for s in cached["sources"]],
-            retrieval_time_ms=float(cached["retrieval_time_ms"]),
-            context_chunks=int(cached["context_chunks"]),
-            model_used=cached["model_used"] + " (cached)",
-            created_at=datetime.now(timezone.utc),
-        )
+        cached_answer = cached.get("answer", "")
+        cached_chunks = int(cached.get("context_chunks", 0))
+        cached_sources = cached.get("sources", [])
+        if _is_unavailable_response(cached_answer, cached_chunks, cached_sources):
+            logger.info("Ignoring unavailable cached response for question=%r", question[:80])
+            await cache_service.delete_cache_pattern(cache_key)
+        else:
+            logger.info("Cache hit for question=%r", question[:80])
+            return QueryResponse(
+                question=cached["question"],
+                answer=cached["answer"],
+                sources=[SourceChunk(**s) for s in cached["sources"]],
+                retrieval_time_ms=float(cached["retrieval_time_ms"]),
+                context_chunks=int(cached["context_chunks"]),
+                model_used=cached["model_used"] + " (cached)",
+                created_at=datetime.now(timezone.utc),
+            )
 
     logger.info("RAG query started | question=%r k=%d", question[:80], k)
 
@@ -94,7 +126,7 @@ async def answer_question(question: str, k: int = 5) -> QueryResponse:
 
     if not merged_context:
         logger.warning("No relevant context found for question: %r", question[:80])
-        answer = "I could not find the answer in the retrieved documents."
+        answer = "Chunk not available."
     else:
         prompt = build_prompt(question, merged_context)
         logger.debug("Calling Gemini model=%s prompt_chars=%d", settings.gemini_model, len(prompt))
@@ -128,18 +160,21 @@ async def answer_question(question: str, k: int = 5) -> QueryResponse:
 
     logger.info("RAG query complete | total_ms=%.1f", total_ms)
 
-    await cache_service.set_cached_json(
-        cache_key,
-        {
-            "question": question,
-            "answer": answer,
-            "sources": [s.model_dump() for s in sources],
-            "retrieval_time_ms": retrieval_time_ms,
-            "context_chunks": len(relevant_docs),
-            "model_used": settings.gemini_model,
-        },
-        ttl_seconds=settings.cache_ttl_seconds,
-    )
+    if not _is_unavailable_response(answer, len(relevant_docs), sources):
+        await cache_service.set_cached_json(
+            cache_key,
+            {
+                "question": question,
+                "answer": answer,
+                "sources": [s.model_dump() for s in sources],
+                "retrieval_time_ms": retrieval_time_ms,
+                "context_chunks": len(relevant_docs),
+                "model_used": settings.gemini_model,
+            },
+            ttl_seconds=settings.cache_ttl_seconds,
+        )
+    else:
+        await cache_service.delete_cache_pattern(cache_key)
 
     return QueryResponse(
         question=question,

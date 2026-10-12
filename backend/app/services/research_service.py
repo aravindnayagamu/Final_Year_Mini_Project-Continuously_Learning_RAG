@@ -146,6 +146,28 @@ async def delete_research_paper(paper_id: str) -> bool:
     return True
 
 
+def _is_unavailable_response(answer: str, context_chunks: int, sources: list) -> bool:
+    if context_chunks == 0 or not sources:
+        return True
+    lower = answer.lower().strip()
+    negative_phrases = (
+        "chunk not available",
+        "chunks not available",
+        "no chunk available",
+        "no chunks available",
+        "no chunks found",
+        "could not find",
+        "cannot find",
+        "not found in the retrieved",
+        "not found in the context",
+        "not available in the retrieved",
+        "not available in the context",
+        "no relevant information",
+    )
+
+    return any(phrase in lower for phrase in negative_phrases)
+
+
 async def query_research(
     question: str,
     paper_id: Optional[str] = None,
@@ -154,16 +176,23 @@ async def query_research(
     cache_key = cache_service.build_cache_key("research_query", paper_id or "all", question, k)
     cached = await cache_service.get_cached_json(cache_key)
     if cached:
-        logger.info("Cache hit for research query=%r paper_id=%s", question[:80], paper_id)
-        return ResearchQueryResponse(
-            question=cached["question"],
-            answer=cached["answer"],
-            sources=[SourceChunk(**s) for s in cached["sources"]],
-            retrieval_time_ms=float(cached["retrieval_time_ms"]),
-            context_chunks=int(cached["context_chunks"]),
-            model_used=cached["model_used"] + " (cached)",
-            created_at=datetime.now(timezone.utc).isoformat(),
-        )
+        cached_answer = cached.get("answer", "")
+        cached_chunks = int(cached.get("context_chunks", 0))
+        cached_sources = cached.get("sources", [])
+        if _is_unavailable_response(cached_answer, cached_chunks, cached_sources):
+            logger.info("Ignoring unavailable cached response for research query=%r", question[:80])
+            await cache_service.delete_cache_pattern(cache_key)
+        else:
+            logger.info("Cache hit for research query=%r paper_id=%s", question[:80], paper_id)
+            return ResearchQueryResponse(
+                question=cached["question"],
+                answer=cached["answer"],
+                sources=[SourceChunk(**s) for s in cached["sources"]],
+                retrieval_time_ms=float(cached["retrieval_time_ms"]),
+                context_chunks=int(cached["context_chunks"]),
+                model_used=cached["model_used"] + " (cached)",
+                created_at=datetime.now(timezone.utc).isoformat(),
+            )
 
     t0 = time.perf_counter()
     where_filter = {"paper_id": paper_id} if paper_id else {"doc_type": "research_paper"}
@@ -244,18 +273,21 @@ async def query_research(
     except Exception as exc:
         logger.error("Failed to log research query to db: %s", exc)
 
-    await cache_service.set_cached_json(
-        cache_key,
-        {
-            "question": question,
-            "answer": answer,
-            "sources": [s.model_dump() for s in sources],
-            "retrieval_time_ms": retrieval_time_ms,
-            "context_chunks": len(sources),
-            "model_used": settings.gemini_model,
-        },
-        ttl_seconds=settings.cache_ttl_seconds,
-    )
+    if not _is_unavailable_response(answer, len(sources), sources):
+        await cache_service.set_cached_json(
+            cache_key,
+            {
+                "question": question,
+                "answer": answer,
+                "sources": [s.model_dump() for s in sources],
+                "retrieval_time_ms": retrieval_time_ms,
+                "context_chunks": len(sources),
+                "model_used": settings.gemini_model,
+            },
+            ttl_seconds=settings.cache_ttl_seconds,
+        )
+    else:
+        await cache_service.delete_cache_pattern(cache_key)
 
     return ResearchQueryResponse(
         question=question,

@@ -1,10 +1,3 @@
-"""Service layer wrapping the standalone pipeline scripts.
-
-Wraps: fetch_news (RSS source registry), record_metrics (retrieval metrics),
-separate_recent_data (recent -> historical archiving) and summary (daily digest).
-Heavy modules (they load embedding models / Gemini clients at import time) are
-imported lazily.
-"""
 from __future__ import annotations
 
 import asyncio
@@ -15,6 +8,7 @@ import logging
 import sys
 import threading
 from datetime import datetime, timezone
+import time
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import func, select
@@ -22,6 +16,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.db.models import Document
+
+from app.fetch_news import RSS_SOURCES
+import app.record_metrics as record_metrics
+from app.retrive import recent_store, historical_store
+from app.summary import create_summary
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -35,16 +34,10 @@ _summary_lock = threading.Lock()
 _separate_lock = threading.Lock()
 
 
-# ── Sources ──────────────────────────────────────────────────────────────────
-
 def _group_of(source_name: str) -> str:
     return source_name.split("_", 1)[0]
 
-
 async def get_sources(db: AsyncSession) -> List[Dict[str, Any]]:
-    """All configured RSS sources (fetch_news.RSS_SOURCES) with document counts."""
-    from fetch_news import RSS_SOURCES  # type: ignore[import]
-
     rows = (
         await db.execute(
             select(
@@ -70,24 +63,17 @@ async def get_sources(db: AsyncSession) -> List[Dict[str, Any]]:
     return sources
 
 
-# ── Metrics ──────────────────────────────────────────────────────────────────
-
 def get_metrics() -> Dict[str, Any]:
-    import record_metrics  # type: ignore[import]
-
     with record_metrics._LOCK:
         return record_metrics._load_metrics()
 
 
 def reset_metrics() -> Dict[str, Any]:
-    import record_metrics  # type: ignore[import]
-
     record_metrics.reset_metrics()
     return get_metrics()
 
 
 def record_query_metrics(question: str, retrieved: list, retrieval_time_ms: float) -> None:
-    """Feed a /query retrieval into record_metrics; never raises."""
     try:
         from record_metrics import update_metrics  # type: ignore[import]
 
@@ -98,11 +84,9 @@ def record_query_metrics(question: str, retrieved: list, retrieval_time_ms: floa
             retrieval_time_ms=retrieval_time_ms,
             track_precision_at_6=True,
         )
-    except Exception as exc:  # pragma: no cover
+    except Exception as exc:
         logger.warning("Failed to record retrieval metrics: %s", exc)
 
-
-# ── Recent -> historical separation ──────────────────────────────────────────
 
 def _parse_separation_output(text: str) -> Dict[str, int]:
     keys = {
@@ -123,7 +107,6 @@ def _parse_separation_output(text: str) -> Dict[str, int]:
 
 
 def run_separation() -> Dict[str, Any]:
-    """Blocking: move recent-store chunks older than 24h to the historical store."""
     if not _separate_lock.acquire(blocking=False):
         raise RuntimeError("Separation is already running.")
     try:
@@ -146,15 +129,11 @@ async def run_separation_async() -> Dict[str, Any]:
 
 
 def get_vector_store_stats() -> Dict[str, Any]:
-    from retrive import recent_store, historical_store  # type: ignore[import]
-
     return {
         "recent_chunks": recent_store._collection.count(),
         "historical_chunks": historical_store._collection.count(),
     }
 
-
-# ── Summary ──────────────────────────────────────────────────────────────────
 
 def get_latest_summary() -> Optional[Dict[str, Any]]:
     if not SUMMARY_FILE.exists():
@@ -169,10 +148,6 @@ def generate_summary_blocking() -> Dict[str, Any]:
     if not _summary_lock.acquire(blocking=False):
         raise RuntimeError("A summary is already being generated.")
     try:
-        import time
-
-        from summary import create_summary  # type: ignore[import]
-
         t0 = time.perf_counter()
         with contextlib.redirect_stdout(io.StringIO()):
             text = create_summary()
@@ -198,3 +173,11 @@ def get_user_preferences() -> Dict[str, Any]:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return {}
+
+
+def save_user_preferences(preferences: Dict[str, Any]) -> Dict[str, Any]:
+    path = settings.app_dir / "user_preferences.json"
+    existing = get_user_preferences()
+    existing.update(preferences)
+    path.write_text(json.dumps(existing, ensure_ascii=False, indent=2), encoding="utf-8")
+    return existing

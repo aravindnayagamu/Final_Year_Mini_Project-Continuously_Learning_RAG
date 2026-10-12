@@ -105,3 +105,8 @@ async def generate_summary(request: Request) -> Dict[str, Any]:
 @router.get("/summary/preferences", tags=["Summary"])
 async def summary_preferences() -> Dict[str, Any]:
     return pipeline_service.get_user_preferences()
+
+
+@router.post("/summary/preferences", tags=["Summary"])
+async def update_summary_preferences(payload: Dict[str, Any]) -> Dict[str, Any]:
+    return pipeline_service.save_user_preferences(payload)

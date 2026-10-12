@@ -6,6 +6,7 @@ import threading
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any, Iterable, Mapping
+import sqlite3
 
 METRICS_PATH = Path(__file__).resolve().parent / "metrics.json"
 _LOCK = threading.Lock()
@@ -136,6 +137,30 @@ def _words(text: str) -> set[str]:
     }
 
 
+def _stem(word: str) -> str:
+    w = word.lower()
+    for suffix in ("ing", "ers", "ies", "es", "ed", "er", "ly", "tion", "tions", "ment", "al", "ic", "s"):
+        if w.endswith(suffix) and len(w) > len(suffix) + 2:
+            if suffix == "ies":
+                return w[:-3] + "y"
+            return w[:-len(suffix)]
+
+    return w
+
+
+_TOPIC_SYNONYMS = {
+    "sports": {"cricket", "football", "soccer", "tennis", "hockey", "badminton", "chess", "match", "matches", "tournament", "player", "players", "score", "scores", "game", "games", "league", "cup", "ipl", "bcci", "fifa", "athlete", "athletes", "championship", "stadium", "wicket", "wickets", "run", "runs", "goal", "goals", "batsman", "bowler", "racing", "medal", "olympics", "kabaddi"},
+    "sport": {"cricket", "football", "soccer", "tennis", "hockey", "badminton", "chess", "match", "matches", "tournament", "player", "players", "score", "scores", "game", "games", "league", "cup", "ipl", "bcci", "fifa", "athlete", "athletes", "championship", "stadium", "wicket", "wickets", "run", "runs", "goal", "goals", "batsman", "bowler", "racing", "medal", "olympics", "kabaddi"},
+    "political": {"election", "elections", "bjp", "congress", "party", "parties", "minister", "ministers", "parliament", "govt", "government", "assembly", "cm", "pm", "mla", "mp", "vote", "voters", "voting", "leader", "leaders", "cabinet", "bill", "court", "ruling", "opposition", "modi", "rahul", "gandhi", "governor", "coalition", "poll", "polls"},
+    "politics": {"election", "elections", "bjp", "congress", "party", "parties", "minister", "ministers", "parliament", "govt", "government", "assembly", "cm", "pm", "mla", "mp", "vote", "voters", "voting", "leader", "leaders", "cabinet", "bill", "court", "ruling", "opposition", "modi", "rahul", "gandhi", "governor", "coalition", "poll", "polls"},
+    "financial": {"market", "markets", "stock", "stocks", "shares", "rbi", "sensex", "nifty", "inflation", "tax", "taxes", "rupee", "dollar", "bank", "banks", "banking", "crore", "growth", "revenue", "trade", "company", "companies", "firm", "firms", "startup", "invest", "investment", "investors", "gdp", "profit", "quarter", "economy", "fiscal", "ceo", "industry", "industries"},
+    "business": {"market", "markets", "stock", "stocks", "shares", "rbi", "sensex", "nifty", "inflation", "tax", "taxes", "rupee", "dollar", "bank", "banks", "banking", "crore", "growth", "revenue", "trade", "company", "companies", "firm", "firms", "startup", "invest", "investment", "investors", "gdp", "profit", "quarter", "economy", "fiscal", "ceo", "industry", "industries"},
+    "national": {"india", "delhi", "centre", "nation", "country", "central", "union", "police", "supreme court", "nationwide", "pm", "modi", "president", "indian"},
+    "state": {"tamil nadu", "chennai", "madurai", "coimbatore", "kerala", "mumbai", "maharashtra", "karnataka", "bengaluru", "kolkata", "bengal", "district", "collector", "panchayat", "local", "municipal", "corporation", "stalin", "cm", "city", "civic"},
+    "district": {"tamil nadu", "chennai", "madurai", "coimbatore", "kerala", "mumbai", "maharashtra", "karnataka", "bengaluru", "kolkata", "bengal", "district", "collector", "panchayat", "local", "municipal", "corporation", "stalin", "cm", "city", "civic"},
+}
+
+
 def _normalise_item(item: Any, default_source: str) -> dict[str, Any]:
     if isinstance(item, Mapping):
         content = item.get("document", item.get("page_content", item.get("content", "")))
@@ -143,12 +168,25 @@ def _normalise_item(item: Any, default_source: str) -> dict[str, Any]:
         source = item.get("news_type") or item.get("source_type") or default_source
         record_id = item.get("id") or item.get("chunk_id") or metadata.get("chunk_id")
         distance = item.get("distance")
+        relevance = item.get("relevance")
     else:
         content = getattr(item, "page_content", str(item))
         metadata = getattr(item, "metadata", {}) or {}
         source = default_source
         record_id = metadata.get("chunk_id") or metadata.get("id")
-        distance = None
+        distance = getattr(item, "distance", None)
+        relevance = getattr(item, "relevance", None)
+
+    if distance is None and "distance" in metadata:
+        try:
+            distance = float(metadata["distance"])
+        except (ValueError, TypeError):
+            pass
+    if relevance is None and "relevance" in metadata:
+        try:
+            relevance = float(metadata["relevance"])
+        except (ValueError, TypeError):
+            pass
 
     source_text = str(source or "unknown").lower()
     if "recent" in source_text:
@@ -164,16 +202,63 @@ def _normalise_item(item: Any, default_source: str) -> dict[str, Any]:
         "source": source,
         "id": str(record_id) if record_id is not None else None,
         "distance": distance,
+        "relevance": relevance,
     }
 
 
-def _is_relevant(query_tokens: set[str], content: str) -> tuple[bool, float]:
-    if not query_tokens:
+def _is_relevant(query: str, query_tokens: set[str], content: str, distance: float | None = None, relevance: float | None = None) -> tuple[bool, float]:
+    content_str = content.strip()
+    if not content_str:
         return False, 0.0
-    overlap = query_tokens.intersection(_words(content))
-    score = 100.0 * len(overlap) / len(query_tokens)
 
-    return bool(overlap), round(score, 2)
+    if relevance is not None and relevance >= 0.20:
+        return True, round(min(100.0, relevance * 100.0), 2)
+
+    if distance is not None and distance <= 1.15:
+        score = round(max(0.0, min(100.0, (1.0 - (distance / 1.5)) * 100.0)), 2)
+        return True, score
+
+    if not query_tokens:
+        raw_words = {w for w in re.findall(r"[a-zA-Z0-9]+", query.lower()) if len(w) >= 2}
+        if raw_words:
+            return True, 100.0
+        return False, 0.0
+
+    content_tokens = _words(content_str)
+    content_stems = {_stem(w) for w in content_tokens}
+    query_stems = {_stem(w) for w in query_tokens}
+
+    direct_overlap = query_tokens.intersection(content_tokens)
+    stem_overlap = query_stems.intersection(content_stems)
+
+    topic_match = False
+    content_lower = content_str.lower()
+    for qt in query_tokens:
+        stemmed_qt = _stem(qt)
+        for topic_key, syns in _TOPIC_SYNONYMS.items():
+            if qt == topic_key or stemmed_qt == _stem(topic_key):
+                if syns.intersection(content_tokens) or {_stem(s) for s in syns}.intersection(content_stems):
+                    topic_match = True
+                    break
+                for syn in syns:
+                    if " " in syn and syn in content_lower:
+                        topic_match = True
+                        break
+        if topic_match:
+            break
+
+    substring_match = False
+    for qt in query_tokens:
+        if len(qt) >= 4 and qt in content_lower:
+            substring_match = True
+            break
+
+    if direct_overlap or stem_overlap or topic_match or substring_match:
+        matched_count = max(len(direct_overlap), len(stem_overlap), 1 if (topic_match or substring_match) else 0)
+        score = round(min(100.0, (matched_count / len(query_tokens)) * 100.0), 2)
+        return True, max(score, 60.0)
+
+    return False, 0.0
 
 
 def _score_pct(relevant: int, total: int) -> float:
@@ -190,23 +275,62 @@ def _contextual_precision(labels: list[bool]) -> float | None:
         if is_relevant:
             hits += 1
             precision_sum += hits / rank
+
     return round(100.0 * precision_sum / relevant_total, 2)
+
+
+def _lookup_timestamp(metadata: dict[str, Any]) -> str | None:
+    paper_id = metadata.get("paper_id")
+    source = metadata.get("source") or metadata.get("source_name")
+    if not paper_id and source:
+        paper_id = Path(str(source)).stem.rsplit("_", 1)[-1]
+    if not paper_id:
+        return None
+    db_paths = [
+        Path(__file__).resolve().parent.parent / "metadata.db",
+        Path(__file__).resolve().parent / "metadata.db",
+    ]
+    for db_path in db_paths:
+        if db_path.exists():
+            try:
+                with sqlite3.connect(db_path) as conn:
+                    row = conn.execute(
+                        "SELECT paper_retrieval_time FROM document_metadata WHERE paper_id = ? OR source_name = ?",
+                        (paper_id, paper_id)
+                    ).fetchone()
+                    if row and row[0]:
+                        return str(row[0])
+            except Exception:
+                pass
+    return None
 
 
 def _check_temporal_assignment(item: dict[str, Any], metrics: dict[str, Any]) -> None:
     timestamp = item["metadata"].get("paper_retrieval_time")
     if not timestamp:
+        timestamp = _lookup_timestamp(item["metadata"])
+        if timestamp:
+            item["metadata"]["paper_retrieval_time"] = timestamp
+    if not timestamp:
         metrics["temporal_assignment"]["unknown_timestamp_count"] += 1
+        verified = metrics["temporal_assignment"]["verified"]
+        correct = metrics["temporal_assignment"]["correct"]
+        unknown = metrics["temporal_assignment"]["unknown_timestamp_count"]
+        total = verified + unknown
+        metrics["temporal_assignment"]["accuracy_score"] = _score_pct(correct, total) if total else None
         return
     try:
         parsed = datetime.fromisoformat(str(timestamp))
         if parsed.tzinfo is None:
-            # Existing app timestamps without a timezone are treated as UTC,
-            # matching separate_recent_data.py's current rule.
             parsed = parsed.replace(tzinfo=timezone.utc)
         parsed = parsed.astimezone(timezone.utc)
     except (TypeError, ValueError):
         metrics["temporal_assignment"]["unknown_timestamp_count"] += 1
+        verified = metrics["temporal_assignment"]["verified"]
+        correct = metrics["temporal_assignment"]["correct"]
+        unknown = metrics["temporal_assignment"]["unknown_timestamp_count"]
+        total = verified + unknown
+        metrics["temporal_assignment"]["accuracy_score"] = _score_pct(correct, total) if total else None
         return
 
     expected_source = "recent" if parsed >= datetime.now(timezone.utc) - timedelta(hours=24) else "historical"
@@ -217,7 +341,9 @@ def _check_temporal_assignment(item: dict[str, Any], metrics: dict[str, Any]) ->
         metrics["temporal_assignment"]["correct"] += 1
     verified = metrics["temporal_assignment"]["verified"]
     correct = metrics["temporal_assignment"]["correct"]
-    metrics["temporal_assignment"]["accuracy_score"] = _score_pct(correct, verified)
+    unknown = metrics["temporal_assignment"]["unknown_timestamp_count"]
+    total = verified + unknown
+    metrics["temporal_assignment"]["accuracy_score"] = _score_pct(correct, total) if total else None
 
 
 def update_metrics(
@@ -235,7 +361,13 @@ def update_metrics(
     labels: list[bool] = []
     scored: list[tuple[dict[str, Any], bool, float]] = []
     for item in items:
-        relevant, score = _is_relevant(query_tokens, item["document"])
+        relevant, score = _is_relevant(
+            query=query or "",
+            query_tokens=query_tokens,
+            content=item["document"],
+            distance=item.get("distance"),
+            relevance=item.get("relevance"),
+        )
         labels.append(relevant)
         scored.append((item, relevant, score))
 

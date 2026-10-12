@@ -14,12 +14,26 @@ except ImportError:
 
 
 CUR_DIR = Path(__file__).resolve().parent
-user_preferences=""
-with (CUR_DIR / "user_preferences.json").open(
-    "r", encoding="utf-8") as file:
-    user_preferences = json.load(file)
 
-CUR_DIR = Path(__file__).resolve().parent
+
+def load_user_preferences() -> dict:
+    pref_file = CUR_DIR / "user_preferences.json"
+    if pref_file.exists():
+        try:
+            with pref_file.open("r", encoding="utf-8") as file:
+                return json.load(file)
+        except Exception:
+            pass
+    return {
+        "user_name": "User",
+        "preferred_location": "",
+        "news_categories": ["National news", "State / district news", "Sports"],
+        "specific_interests": [],
+        "summary_detail": "Balanced",
+        "topics_to_avoid": [],
+        "preferred_language": "English",
+    }
+
 
 VECTOR_DB = CUR_DIR / "vector_db"
 HISTORICAL_VECTOR_DB = CUR_DIR / "historical_vector_db"
@@ -75,7 +89,14 @@ NEWS_CATEGORIES = {
 def retrieve_category_news(store, category_query, k=5, source="recent"):
     start_time = time.perf_counter()
 
-    documents = store.similarity_search(category_query,k=k)
+    try:
+        results = store.similarity_search_with_score(category_query, k=k)
+        documents = []
+        for doc, score in results:
+            doc.metadata["distance"] = score
+            documents.append(doc)
+    except Exception:
+        documents = store.similarity_search(category_query, k=k)
 
     elapsed_ms = (time.perf_counter() - start_time) * 1000
 
@@ -117,9 +138,10 @@ def remove_duplicates(documents):
     return unique_documents
 
 def retrieve_personalized_news(store, k=5,source="recent"):
-    categories = user_preferences.get("news_categories", [])
-    interests = user_preferences.get("specific_interests", [])
-    location = user_preferences.get("preferred_location", "")
+    prefs = load_user_preferences()
+    categories = prefs.get("news_categories", [])
+    interests = prefs.get("specific_interests", [])
+    location = prefs.get("preferred_location", "")
 
     queries = []
 
@@ -143,7 +165,14 @@ def retrieve_personalized_news(store, k=5,source="recent"):
     for query in queries:
         start_time = time.perf_counter()
 
-        documents = store.similarity_search(query, k=2)
+        try:
+            results = store.similarity_search_with_score(query, k=2)
+            documents = []
+            for doc, score in results:
+                doc.metadata["distance"] = score
+                documents.append(doc)
+        except Exception:
+            documents = store.similarity_search(query, k=2)
 
         elapsed_ms = (time.perf_counter() - start_time) * 1000
 
@@ -192,6 +221,7 @@ def build_context(recent_category_documents, historical_category_documents):
 
 
 def build_summary_prompt(context):
+    prefs = load_user_preferences()
     prompt = f"""
 You are a news summarization assistant.
 
@@ -238,13 +268,13 @@ news as breaking or current. If a section has no relevant results, say so.
 
 USER PREFERENCES:
 
-- User: {user_preferences.get("user_name", "User")}
-- Location: {user_preferences.get("preferred_location", "")}
-- Preferred categories: {", ".join(user_preferences.get("news_categories", []))}
-- Specific interests: {", ".join(user_preferences.get("specific_interests", []))}
-- Summary detail: {user_preferences.get("summary_detail", "Balanced")}
-- Topics to avoid: {", ".join(user_preferences.get("topics_to_avoid", []))}
-- Preferred language: {user_preferences.get("preferred_language", "English")}
+- User: {prefs.get("user_name", "User")}
+- Location: {prefs.get("preferred_location", "")}
+- Preferred categories: {", ".join(prefs.get("news_categories", []))}
+- Specific interests: {", ".join(prefs.get("specific_interests", []))}
+- Summary detail: {prefs.get("summary_detail", "Balanced")}
+- Topics to avoid: {", ".join(prefs.get("topics_to_avoid", []))}
+- Preferred language: {prefs.get("preferred_language", "English")}
 
 PERSONALIZED NEWS:
 

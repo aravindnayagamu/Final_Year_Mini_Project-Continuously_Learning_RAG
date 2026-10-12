@@ -28,13 +28,8 @@ const api = axios.create({
 export const postQuery = (payload: QueryRequest): Promise<QueryResponse> =>
   api.post<QueryResponse>("/query", payload).then((r) => r.data);
 
-export const getDocuments = (
-  page = 1,
-  pageSize = 20
-): Promise<DocumentOut[]> =>
-  api
-    .get<DocumentOut[]>("/documents", { params: { page, page_size: pageSize } })
-    .then((r) => r.data);
+export const getDocuments = (page = 1, pageSize = 20): Promise<DocumentOut[]> =>
+  api.get<DocumentOut[]>("/documents", { params: { page, page_size: pageSize } }).then((r) => r.data);
 
 export const getDocumentStats = (): Promise<DocumentStats> =>
   api.get<DocumentStats>("/documents/stats").then((r) => r.data);
@@ -54,8 +49,7 @@ export const getHealth = (): Promise<HealthResponse> =>
 export const uploadResearchPaper = (file: File): Promise<ResearchUploadResponse> => {
   const formData = new FormData();
   formData.append("file", file);
-  return api
-    .post<ResearchUploadResponse>("/research/upload", formData, {
+  return api.post<ResearchUploadResponse>("/research/upload", formData, {
       headers: { "Content-Type": "multipart/form-data" },
       timeout: 180_000,
     })
@@ -65,9 +59,7 @@ export const uploadResearchPaper = (file: File): Promise<ResearchUploadResponse>
 export const getResearchPapers = (): Promise<ResearchPaper[]> =>
   api.get<ResearchPaper[]>("/research/papers").then((r) => r.data);
 
-export const queryResearchPaper = (
-  payload: ResearchQueryRequest
-): Promise<ResearchQueryResponse> =>
+export const queryResearchPaper = (payload: ResearchQueryRequest): Promise<ResearchQueryResponse> =>
   api.post<ResearchQueryResponse>("/research/query", payload).then((r) => r.data);
 
 export const deleteResearchPaper = (paperId: string): Promise<{ status: string }> =>
@@ -96,3 +88,6 @@ export const generateSummary = (): Promise<NewsSummary> =>
 
 export const getSummaryPreferences = (): Promise<UserPreferences> =>
   api.get<UserPreferences>("/summary/preferences").then((r) => r.data);
+
+export const updateSummaryPreferences = (payload: UserPreferences): Promise<UserPreferences> =>
+  api.post<UserPreferences>("/summary/preferences", payload).then((r) => r.data);

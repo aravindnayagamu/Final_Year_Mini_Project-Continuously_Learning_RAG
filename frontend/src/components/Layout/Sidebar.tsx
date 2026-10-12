@@ -8,7 +8,7 @@ const NAV_ITEMS = [
   { to: "/research",  icon: "", label: "Research Assistant" },
   { to: "/dashboard", icon: "", label: "Dashboard" },
   { to: "/ingest",    icon: "", label: "Ingestion" },
-  { to: "/summary",   icon: "", label: "News Digest" },
+  { to: "/summary",   icon: "", label: "Personal News Feed" },
   { to: "/sources",   icon: "", label: "Sources" },
   { to: "/metrics",   icon: "", label: "Metrics" },
 ];

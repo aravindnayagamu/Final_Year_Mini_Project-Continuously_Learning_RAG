@@ -25,8 +25,6 @@ export default function IngestPage() {
 
   useEffect(() => {
     fetchRuns();
-    // Fast-poll (5 s) while a job is running; slow-poll (30 s) otherwise.
-    // Re-register whenever hasRunning flips so the interval is correct.
     const interval = hasRunning ? 5_000 : 30_000;
     const id = setInterval(fetchRuns, interval);
     return () => clearInterval(id);

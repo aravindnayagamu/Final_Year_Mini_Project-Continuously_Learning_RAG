@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from "react";
-import { format } from "date-fns";
 import TopBar from "@/components/Layout/TopBar";
 import {
   generateSummary,
@@ -145,7 +144,6 @@ export default function SummaryPage() {
       <TopBar
         title="Personal News Feed"
         subtitle="Personalized news fetched and curated based on your preferences"
-        badge={summary ? `Generated ${format(new Date(summary.generated_at), "dd MMM, HH:mm")}` : undefined}
         actions={
           <div style={{ display: "flex", gap: 8 }}>
             <button

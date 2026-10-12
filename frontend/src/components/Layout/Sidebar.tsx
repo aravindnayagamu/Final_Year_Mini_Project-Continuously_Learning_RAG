@@ -1,7 +1,4 @@
-import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
-import { getHealth } from "@/api/client";
-import type { HealthResponse } from "@/types";
 
 const NAV_ITEMS = [
   { to: "/chat",      icon: "", label: "Chat" },
@@ -14,38 +11,38 @@ const NAV_ITEMS = [
 ];
 
 export default function Sidebar() {
-  const [health, setHealth] = useState<HealthResponse | null>(null);
+  // const [health, setHealth] = useState<HealthResponse | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    const check = async () => {
-      try {
-        const h = await getHealth();
-        if (!cancelled) setHealth(h);
-      } catch {
-        if (!cancelled) setHealth(null);
-      }
-    };
-    check();
-    const id = setInterval(check, 30_000);
-    return () => { cancelled = true; clearInterval(id); };
-  }, []);
+  // useEffect(() => {
+  //   let cancelled = false;
+  //   const check = async () => {
+  //     try {
+  //       const h = await getHealth();
+  //       if (!cancelled) setHealth(h);
+  //     } catch {
+  //       if (!cancelled) setHealth(null);
+  //     }
+  //   };
+  //   check();
+  //   const id = setInterval(check, 30_000);
+  //   return () => { cancelled = true; clearInterval(id); };
+  // }, []);
 
-  const dotClass =
-    health === null
-      ? "loading"
-      : health.status === "ok"
-      ? "ok"
-      : health.status === "degraded"
-      ? "degraded"
-      : "error";
+  // const dotClass =
+  //   health === null
+  //     ? "loading"
+  //     : health.status === "ok"
+  //     ? "ok"
+  //     : health.status === "degraded"
+  //     ? "degraded"
+  //     : "error";
 
-  const healthLabel =
-    health === null
-      ? "Checking…"
-      : health.status === "ok"
-      ? "All systems operational"
-      : "Service degraded";
+  // const healthLabel =
+  //   health === null
+  //     ? "Checking…"
+  //     : health.status === "ok"
+  //     ? "All systems operational"
+  //     : "Service degraded";
 
   return (
     <aside className="sidebar">
@@ -75,10 +72,10 @@ export default function Sidebar() {
       </nav>
 
       <div className="sidebar-footer">
-        <div className="health-indicator">
+        {/* <div className="health-indicator">
           <span className={`health-dot ${dotClass}`} />
           <span>{healthLabel}</span>
-        </div>
+        </div> */}
       </div>
     </aside>
   );

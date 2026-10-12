@@ -143,7 +143,7 @@ export default function ChatPage() {
               <p style={{ fontSize: 13, color: "var(--text-muted)", maxWidth: 460 }}>
                 Your questions are answered using articles continuously fetched from live news feeds and stored in ChromaDB.
               </p>
-              <button
+              {/* <button
                 className="btn btn-primary btn-sm"
                 style={{ marginTop: 16 }}
                 onClick={handlePullNews}
@@ -156,7 +156,7 @@ export default function ChatPage() {
                 ) : (
                   <>Pull Latest News Now</>
                 )}
-              </button>
+              </button> */}
             </div>
           </div>
         ) : (

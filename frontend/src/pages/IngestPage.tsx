@@ -67,8 +67,8 @@ export default function IngestPage() {
           <div className="ingest-info">
             <h2>Manual Ingestion</h2>
             <p>
-              Fetch the latest articles from TOI, NDTV, and PIB India, then chunk, embed, and
-              store them in ChromaDB. This usually takes 30–90 seconds depending on the number of
+              Fetch the latest articles from RSS Feeds, then chunk, embed, and
+              store them in ChromaDB. This usually takes a few minutes depending on the number of
               new articles.
             </p>
 
@@ -105,7 +105,7 @@ export default function IngestPage() {
         </div>
 
         {/* Info grid */}
-        <div
+        {/* <div
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(3, 1fr)",
@@ -141,7 +141,7 @@ export default function IngestPage() {
               </div>
             </div>
           ))}
-        </div>
+        </div> */}
 
         {/* Runs table */}
         <div className="section-title">Run History</div>

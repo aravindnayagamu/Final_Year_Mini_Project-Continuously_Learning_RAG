@@ -1,26 +1,43 @@
+import os
 from pathlib import Path
 import sqlite3
 from datetime import datetime, timedelta, timezone
+from dotenv import load_dotenv
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 
+ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
+load_dotenv(dotenv_path=ENV_FILE)
+load_dotenv()
+
 CUR_DIR = Path(__file__).resolve().parent
 PROJECT_DIR = CUR_DIR.parent
+app_dir_name = os.getenv("APP_DIR", "app")
 METADATA_DB = PROJECT_DIR / "metadata.db"
 BATCH_SIZE = 500
 
+embedding_model_name = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 embedding_model = HuggingFaceEmbeddings(
-    model_name="sentence-transformers/all-MiniLM-L6-v2"
+    model_name=embedding_model_name
 )
+
+sqlite_db_url = os.getenv("SQLITE_DB_URL", "")
+if sqlite_db_url and sqlite_db_url.startswith("sqlite:///"):
+    recent_db_dir = (PROJECT_DIR / sqlite_db_url.replace("sqlite:///", "")).parent
+else:
+    recent_db_dir = PROJECT_DIR / app_dir_name / "vector_db"
+
+historical_db_dir = PROJECT_DIR / app_dir_name / "historical_vector_db"
+
 recent_store = Chroma(
     collection_name="recent_news_docs",
     embedding_function=embedding_model,
-    persist_directory=str(CUR_DIR / "vector_db")
+    persist_directory=str(recent_db_dir)
 )
 historical_store = Chroma(
     collection_name="historical_news_docs",
     embedding_function=embedding_model,
-    persist_directory=str(CUR_DIR / "historical_vector_db")
+    persist_directory=str(historical_db_dir)
 )
 
 

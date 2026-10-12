@@ -1,5 +1,6 @@
 import time
 import os
+import concurrent.futures
 from pathlib import Path
 from dotenv import load_dotenv
 from google import genai
@@ -53,19 +54,24 @@ if not GEMINI_MODEL:
 
 client = genai.Client(api_key=GEMINI_API_KEY)
 
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
-embedding_model = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
-
-recent_store = Chroma(
-    collection_name="recent_news_docs",
-    embedding_function=embedding_model,
-    persist_directory=str(VECTOR_DB)
-)
-historical_store = Chroma(
-    collection_name="historical_news_docs",
-    embedding_function=embedding_model,
-    persist_directory=str(HISTORICAL_VECTOR_DB)
-)
+try:
+    from retrive import recent_store, historical_store
+except ImportError:
+    try:
+        from app.retrive import recent_store, historical_store
+    except ImportError:
+        EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+        embedding_model = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
+        recent_store = Chroma(
+            collection_name="recent_news_docs",
+            embedding_function=embedding_model,
+            persist_directory=str(VECTOR_DB)
+        )
+        historical_store = Chroma(
+            collection_name="historical_news_docs",
+            embedding_function=embedding_model,
+            persist_directory=str(HISTORICAL_VECTOR_DB)
+        )
 
 
 NEWS_CATEGORIES = {
@@ -162,28 +168,29 @@ def retrieve_personalized_news(store, k=5,source="recent"):
 
     candidate_groups = []
 
-    for query in queries:
+    def _fetch_single_query(q):
         start_time = time.perf_counter()
-
         try:
-            results = store.similarity_search_with_score(query, k=2)
+            results = store.similarity_search_with_score(q, k=2)
             documents = []
             for doc, score in results:
                 doc.metadata["distance"] = score
                 documents.append(doc)
         except Exception:
-            documents = store.similarity_search(query, k=2)
+            documents = store.similarity_search(q, k=2)
 
         elapsed_ms = (time.perf_counter() - start_time) * 1000
 
         update_metrics(
-            query=query,
+            query=q,
             documents=documents,
             source=source,
             retrieval_time_ms=elapsed_ms,
         )
+        return documents
 
-        candidate_groups.append(documents)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(4, len(queries))) as executor:
+        candidate_groups = list(executor.map(_fetch_single_query, queries))
 
     candidates = []
     max_length = max(
@@ -323,17 +330,20 @@ END OF RETRIEVED NEWS
 def generate_summary(context):
     prompt = build_summary_prompt(context)
     try:
-        response = client.interactions.create(
-            model=GEMINI_MODEL,
-            input=prompt
-        )
-        return response.output_text
-    except Exception:
         response = client.models.generate_content(
             model=GEMINI_MODEL,
             contents=prompt
         )
         return response.text or ""
+    except Exception:
+        try:
+            response = client.interactions.create(
+                model=GEMINI_MODEL,
+                input=prompt
+            )
+            return response.output_text
+        except Exception:
+            return ""
 
 def create_summary():
     print("\nRetrieving recent and historical news...\n")
@@ -341,17 +351,29 @@ def create_summary():
     recent_category_documents = {}
     historical_category_documents = {}
 
-    for category, query in NEWS_CATEGORIES.items():
-        print(f"Retrieving recent: {category}")
-        recent_category_documents[category] = retrieve_category_news(recent_store, query, k=5,source="recent")
-        print(f"Retrieving historical: {category}")
-        historical_category_documents[category] = retrieve_category_news(historical_store, query, k=5,source="historical")
-    
+    def _fetch_cat_recent(cat, q):
+        return cat, retrieve_category_news(recent_store, q, k=5, source="recent")
+
+    def _fetch_cat_historical(cat, q):
+        return cat, retrieve_category_news(historical_store, q, k=5, source="historical")
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
+        futures_recent = [executor.submit(_fetch_cat_recent, cat, q) for cat, q in NEWS_CATEGORIES.items()]
+        futures_hist = [executor.submit(_fetch_cat_historical, cat, q) for cat, q in NEWS_CATEGORIES.items()]
+        for f in concurrent.futures.as_completed(futures_recent):
+            cat, docs = f.result()
+            recent_category_documents[cat] = docs
+        for f in concurrent.futures.as_completed(futures_hist):
+            cat, docs = f.result()
+            historical_category_documents[cat] = docs
+
     print("Retrieving personalized news...")
 
-    recent_category_documents["PERSONALIZED NEWS FOR YOU"] = (retrieve_personalized_news(recent_store, k=5,source="recent"))
-
-    historical_category_documents["PERSONALIZED NEWS FOR YOU"] = (retrieve_personalized_news(historical_store, k=5,source="historical"))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+        f_recent_p = executor.submit(retrieve_personalized_news, recent_store, 5, "recent")
+        f_hist_p = executor.submit(retrieve_personalized_news, historical_store, 5, "historical")
+        recent_category_documents["PERSONALIZED NEWS FOR YOU"] = f_recent_p.result()
+        historical_category_documents["PERSONALIZED NEWS FOR YOU"] = f_hist_p.result()
 
     for category in recent_category_documents:
         recent_category_documents[category] = remove_duplicates(recent_category_documents[category])

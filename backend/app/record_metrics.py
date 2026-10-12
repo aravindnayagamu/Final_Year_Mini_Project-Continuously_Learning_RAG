@@ -280,6 +280,9 @@ def _contextual_precision(labels: list[bool]) -> float | None:
     return round(100.0 * precision_sum / relevant_total, 2)
 
 
+_timestamp_cache: dict[str, str | None] = {}
+
+
 def _lookup_timestamp(metadata: dict[str, Any]) -> str | None:
     paper_id = metadata.get("paper_id")
     source = metadata.get("source") or metadata.get("source_name")
@@ -287,6 +290,9 @@ def _lookup_timestamp(metadata: dict[str, Any]) -> str | None:
         paper_id = Path(str(source)).stem.rsplit("_", 1)[-1]
     if not paper_id:
         return None
+
+    if paper_id in _timestamp_cache:
+        return _timestamp_cache[paper_id]
 
     db_url = os.getenv("DATABASE_URL", "")
     if db_url:
@@ -301,7 +307,9 @@ def _lookup_timestamp(metadata: dict[str, Any]) -> str | None:
                     )
                     row = cur.fetchone()
                     if row and row[0]:
-                        return row[0].isoformat() if hasattr(row[0], "isoformat") else str(row[0])
+                        val = row[0].isoformat() if hasattr(row[0], "isoformat") else str(row[0])
+                        _timestamp_cache[paper_id] = val
+                        return val
         except Exception:
             pass
 
@@ -318,9 +326,12 @@ def _lookup_timestamp(metadata: dict[str, Any]) -> str | None:
                         (paper_id, paper_id)
                     ).fetchone()
                     if row and row[0]:
-                        return str(row[0])
+                        val = str(row[0])
+                        _timestamp_cache[paper_id] = val
+                        return val
             except Exception:
                 pass
+    _timestamp_cache[paper_id] = None
     return None
 
 

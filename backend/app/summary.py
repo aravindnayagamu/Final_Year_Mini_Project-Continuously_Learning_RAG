@@ -2,10 +2,12 @@ import time
 import os
 import concurrent.futures
 from pathlib import Path
+from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
 from google import genai
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
+from langchain_core.documents import Document as LangchainDocument
 import json
 
 try:
@@ -27,12 +29,19 @@ def load_user_preferences() -> dict:
             pass
     return {
         "user_name": "User",
-        "preferred_location": "",
-        "news_categories": ["National news", "State / district news", "Sports"],
+        "news_categories": [
+            "National news",
+            "State / district news",
+            "Political news",
+            "International news",
+            "Sports",
+            "Technology",
+            "Financial / Business news",
+            "Entertainment news",
+        ],
         "specific_interests": [],
         "summary_detail": "Balanced",
         "topics_to_avoid": [],
-        "preferred_language": "English",
     }
 
 
@@ -74,6 +83,17 @@ except ImportError:
         )
 
 
+SOURCES_BY_CATEGORY = {
+    "NATIONAL NEWS": ["Hindu_India", "TOI_India", "IE_India", "PIB_India"],
+    "STATE / DISTRICT NEWS": ["Hindu_TamilNadu", "NDTV_South", "Hindu_Chennai", "TOI_Delhi", "TOI_Bengaluru"],
+    "POLITICAL NEWS": ["IE_Political_Pulse", "News18_Politics", "ThePrint_Politics", "NDTV_India", "Politico_Top", "BBC_Politics", "Guardian_Politics"],
+    "INTERNATIONAL NEWS": ["BBC_World", "Guardian_World", "AlJazeera_All"],
+    "SPORTS": ["ESPNcricinfo_Top", "Sportstar_Top", "BBC_Sport"],
+    "TECHNOLOGY": ["TheVerge", "TechCrunch", "Wired"],
+    "FINANCIAL / BUSINESS NEWS": ["EconomicTimes_Top", "LiveMint_Top", "MoneyControl_Top"],
+    "ENTERTAINMENT NEWS": ["BollywoodHungama", "Variety", "Hindu_Cinema", "ABPLive_Entertainment"],
+}
+
 NEWS_CATEGORIES = {
     "NATIONAL NEWS":
         "important national news and major developments in India",
@@ -81,39 +101,115 @@ NEWS_CATEGORIES = {
     "STATE / DISTRICT NEWS":
         "important state-level and district-level news and local developments in India",
 
+    "POLITICAL NEWS":
+        "important political news, government decisions, elections, political parties and politicians",
+
+    "INTERNATIONAL NEWS":
+        "important world news, global affairs, international diplomacy and international relations",
+
     "SPORTS":
         "important sports news, matches, tournaments, players and sporting events",
+
+    "TECHNOLOGY":
+        "important technology news, artificial intelligence, gadgets, tech companies and software",
 
     "FINANCIAL / BUSINESS NEWS":
         "important financial, economic, stock market, business and corporate news",
 
-    "POLITICAL NEWS":
-        "important political news, government decisions, elections, political parties and politicians"
+    "ENTERTAINMENT NEWS":
+        "important entertainment news, cinema, movies, celebrities, music and cultural events",
 }
 
 
-def retrieve_category_news(store, category_query, k=5, source="recent"):
-    start_time = time.perf_counter()
-
+def _parse_item_dt(value):
+    if not value:
+        return None
     try:
-        results = store.similarity_search_with_score(category_query, k=k)
-        documents = []
-        for doc, score in results:
-            doc.metadata["distance"] = score
-            documents.append(doc)
+        dt = datetime.fromisoformat(str(value))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
     except Exception:
-        documents = store.similarity_search(category_query, k=k)
+        return None
+
+
+def retrieve_category_news(store, category_name, category_query, k=5, source="recent"):
+    start_time = time.perf_counter()
+    srcs = SOURCES_BY_CATEGORY.get(category_name, [])
+    now = datetime.now(timezone.utc)
+    cutoff_24h = now - timedelta(hours=24)
+    cutoff_3d = now - timedelta(days=3)
+
+    docs = []
+    try:
+        res = store._collection.get(
+            where={"source_name": {"$in": srcs}} if srcs else None,
+            limit=30,
+            include=["documents", "metadatas"]
+        )
+        candidates_24h = []
+        candidates_3d = []
+        for i, meta in enumerate(res.get("metadatas", [])):
+            text = res["documents"][i]
+            if len(text.strip()) < 80:
+                continue
+            dt = _parse_item_dt(meta.get("paper_retrieval_time"))
+            d = LangchainDocument(page_content=text, metadata=dict(meta))
+            if dt and dt >= cutoff_24h:
+                candidates_24h.append(d)
+            elif dt and dt >= cutoff_3d:
+                candidates_3d.append(d)
+
+        if candidates_24h:
+            docs = candidates_24h[:k]
+            for d in docs:
+                d.metadata["timeframe"] = "Last 24 Hours"
+        elif candidates_3d:
+            docs = candidates_3d[:k]
+            for d in docs:
+                d.metadata["timeframe"] = "Past 3 Days"
+        elif source == "recent":
+            try:
+                res_h = historical_store._collection.get(
+                    where={"source_name": {"$in": srcs}} if srcs else None,
+                    limit=25,
+                    include=["documents", "metadatas"]
+                )
+                for i, meta in enumerate(res_h.get("metadatas", [])):
+                    text = res_h["documents"][i]
+                    if len(text.strip()) < 80:
+                        continue
+                    dt = _parse_item_dt(meta.get("paper_retrieval_time"))
+                    if dt and dt >= cutoff_3d:
+                        d = LangchainDocument(page_content=text, metadata=dict(meta))
+                        d.metadata["timeframe"] = "Past 3 Days"
+                        candidates_3d.append(d)
+                if candidates_3d:
+                    docs = candidates_3d[:k]
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    if not docs:
+        try:
+            results = store.similarity_search_with_score(category_query, k=k)
+            for doc, score in results:
+                doc.metadata["distance"] = score
+                docs.append(doc)
+        except Exception:
+            docs = store.similarity_search(category_query, k=k)
 
     elapsed_ms = (time.perf_counter() - start_time) * 1000
 
     update_metrics(
         query=category_query,
-        documents=documents,
+        documents=docs,
         source=source,
         retrieval_time_ms=elapsed_ms,
     )
 
-    return documents
+    return docs
 
 
 def remove_duplicates(documents):
@@ -143,22 +239,15 @@ def remove_duplicates(documents):
 
     return unique_documents
 
-def retrieve_personalized_news(store, k=5,source="recent"):
+def retrieve_personalized_news(store, k=5, source="recent"):
     prefs = load_user_preferences()
     categories = prefs.get("news_categories", [])
     interests = prefs.get("specific_interests", [])
-    location = prefs.get("preferred_location", "")
 
     queries = []
 
-    if location:
-        queries.append(f"Local and regional news in {location}")
-
     for category in categories:
-        if "state" in category.lower() and location:
-            queries.append(f"{category} in {location}")
-        else:
-            queries.append(category)
+        queries.append(category)
 
     for interest in interests:
         queries.append(f"News and recent developments about {interest}")
@@ -208,7 +297,7 @@ def retrieve_personalized_news(store, k=5,source="recent"):
 def build_context(recent_category_documents, historical_category_documents):
     context_parts = []
     groups = (
-        ("RECENT NEWS (downloaded within the last 24 hours)", recent_category_documents),
+        ("RECENT NEWS (downloaded within the last 24 hours, or past 3 days fallback)", recent_category_documents),
         ("HISTORICAL NEWS (downloaded more than 24 hours ago)", historical_category_documents),
     )
     for label, category_documents in groups:
@@ -219,7 +308,8 @@ def build_context(recent_category_documents, historical_category_documents):
                 metadata = document.metadata
                 context_parts.append(
                     f"\nNEWS CHUNK {index}\n"
-                    f"Source: {metadata.get('source', 'Unknown')}\n"
+                    f"Source: {metadata.get('source_name', metadata.get('source', 'Unknown'))}\n"
+                    f"Timeframe: {metadata.get('timeframe', 'Unknown')}\n"
                     f"Downloaded: {metadata.get('paper_retrieval_time', 'Unknown')}\n"
                     f"Paper ID: {metadata.get('paper_id', 'Unknown')}\n"
                     f"Content:\n{document.page_content}\n"
@@ -257,39 +347,33 @@ IMPORTANT RULES:
    organizations and other factual details present in
    the source.
 
-8. If there is no relevant news for a category, write:
-   "No relevant news found in the retrieved context."
+8. For each news category, present the news from the last 24 hours. If the context for a category notes that news was fetched from the past 3 days (fallback), present the news from the past 3 days and clearly mention the timeframe. Only if no news was found even within the past 3 days, write:
+   "No relevant news found in the last 3 days."
 
 Organize the output into these sections, keeping recent and historical news separate:
 
-## RECENT / HOT NEWS (LAST 24 HOURS)
-Include subsections for NATIONAL NEWS, STATE / DISTRICT NEWS, SPORTS,
-FINANCIAL / BUSINESS NEWS, and POLITICAL NEWS.
+## RECENT / HOT NEWS
+Include subsections for each provided category: NATIONAL NEWS, STATE / DISTRICT NEWS, POLITICAL NEWS, INTERNATIONAL NEWS, SPORTS, TECHNOLOGY, FINANCIAL / BUSINESS NEWS, ENTERTAINMENT NEWS, and PERSONALIZED NEWS FOR YOU.
 
 ## HISTORICAL NEWS (OLDER THAN 24 HOURS)
-Include subsections for NATIONAL NEWS, STATE / DISTRICT NEWS, SPORTS,
-FINANCIAL / BUSINESS NEWS, and POLITICAL NEWS.
+Include subsections for each provided category with relevant historical context.
 
-Clearly identify the download timestamp when available. Do not describe historical
+Clearly identify the download timestamp and source when available. Do not describe historical
 news as breaking or current. If a section has no relevant results, say so.
 
 USER PREFERENCES:
 
 - User: {prefs.get("user_name", "User")}
-- Location: {prefs.get("preferred_location", "")}
 - Preferred categories: {", ".join(prefs.get("news_categories", []))}
 - Specific interests: {", ".join(prefs.get("specific_interests", []))}
 - Summary detail: {prefs.get("summary_detail", "Balanced")}
 - Topics to avoid: {", ".join(prefs.get("topics_to_avoid", []))}
-- Preferred language: {prefs.get("preferred_language", "English")}
 
 PERSONALIZED NEWS:
 
-- Within both the RECENT / HOT NEWS and HISTORICAL NEWS
-  sections, include a subsection named PERSONALIZED NEWS FOR YOU.
+- Within both sections, include a subsection named PERSONALIZED NEWS FOR YOU.
 - Use the context under PERSONALIZED NEWS FOR YOU to identify
-  stories matching the user's preferred location, news categories,
-  and specific interests.
+  stories matching the user's news categories and specific interests.
 - Give relevant personalized stories appropriate prominence.
 - Do not force personalization when the retrieved stories do not
   match the user's preferences.
@@ -351,15 +435,24 @@ def create_summary():
     recent_category_documents = {}
     historical_category_documents = {}
 
+    prefs = load_user_preferences()
+    user_cats = prefs.get("news_categories", [])
+    active_categories = {}
+    for cat_key, query in NEWS_CATEGORIES.items():
+        if not user_cats or any(c.strip().lower() in cat_key.lower() or cat_key.lower() in c.strip().lower() for c in user_cats):
+            active_categories[cat_key] = query
+    if not active_categories:
+        active_categories = NEWS_CATEGORIES
+
     def _fetch_cat_recent(cat, q):
-        return cat, retrieve_category_news(recent_store, q, k=5, source="recent")
+        return cat, retrieve_category_news(recent_store, cat, q, k=5, source="recent")
 
     def _fetch_cat_historical(cat, q):
-        return cat, retrieve_category_news(historical_store, q, k=5, source="historical")
+        return cat, retrieve_category_news(historical_store, cat, q, k=5, source="historical")
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
-        futures_recent = [executor.submit(_fetch_cat_recent, cat, q) for cat, q in NEWS_CATEGORIES.items()]
-        futures_hist = [executor.submit(_fetch_cat_historical, cat, q) for cat, q in NEWS_CATEGORIES.items()]
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(8, len(active_categories))) as executor:
+        futures_recent = [executor.submit(_fetch_cat_recent, cat, q) for cat, q in active_categories.items()]
+        futures_hist = [executor.submit(_fetch_cat_historical, cat, q) for cat, q in active_categories.items()]
         for f in concurrent.futures.as_completed(futures_recent):
             cat, docs = f.result()
             recent_category_documents[cat] = docs

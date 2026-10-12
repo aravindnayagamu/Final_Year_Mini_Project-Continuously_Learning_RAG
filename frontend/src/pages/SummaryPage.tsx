@@ -11,9 +11,12 @@ import type { NewsSummary, UserPreferences } from "@/types";
 const ALL_CATEGORY_OPTIONS = [
   "National news",
   "State / district news",
-  "Sports",
-  "Financial / Business news",
   "Political news",
+  "International news",
+  "Sports",
+  "Technology",
+  "Financial / Business news",
+  "Entertainment news",
 ];
 
 const DETAIL_OPTIONS = ["Quick", "Balanced", "In-depth"];
@@ -57,22 +60,18 @@ export default function SummaryPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [userName, setUserName] = useState("");
-  const [location, setLocation] = useState("");
   const [categories, setCategories] = useState<string[]>([]);
   const [interestsText, setInterestsText] = useState("");
   const [summaryDetail, setSummaryDetail] = useState("Balanced");
-  const [language, setLanguage] = useState("English");
   const [savingPrefs, setSavingPrefs] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [showConfig, setShowConfig] = useState(true);
 
   const syncFormFromPrefs = (p: UserPreferences) => {
     setUserName(p.user_name ?? "User");
-    setLocation(p.preferred_location ?? "");
-    setCategories(p.news_categories ?? []);
+    setCategories(p.news_categories && p.news_categories.length > 0 ? p.news_categories : ALL_CATEGORY_OPTIONS);
     setInterestsText((p.specific_interests ?? []).join(", "));
     setSummaryDetail(p.summary_detail ?? "Balanced");
-    setLanguage(p.preferred_language ?? "English");
   };
 
   const load = useCallback(async () => {
@@ -107,11 +106,9 @@ export default function SummaryPage() {
         .filter(Boolean);
       const updated: UserPreferences = {
         user_name: userName.trim() || "User",
-        preferred_location: location.trim(),
         news_categories: categories,
         specific_interests: parsedInterests,
         summary_detail: summaryDetail,
-        preferred_language: language.trim() || "English",
         topics_to_avoid: prefs?.topics_to_avoid ?? [],
       };
       const saved = await updateSummaryPreferences(updated);
@@ -187,7 +184,7 @@ export default function SummaryPage() {
                   Personalization Preferences
                 </h3>
                 <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
-                  Set your location, favorite topics, and interests to tailor your news feed
+                  Set your favorite news categories and interests to tailor your news feed
                 </p>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -209,7 +206,7 @@ export default function SummaryPage() {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+                gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
                 gap: 16,
                 marginBottom: 16,
               }}
@@ -223,28 +220,6 @@ export default function SummaryPage() {
                   value={userName}
                   onChange={(e) => setUserName(e.target.value)}
                   placeholder="e.g. John Doe"
-                  style={{
-                    width: "100%",
-                    background: "var(--bg-elevated)",
-                    border: "1px solid var(--border)",
-                    borderRadius: "var(--radius-sm)",
-                    color: "var(--text-primary)",
-                    padding: "8px 12px",
-                    fontSize: 13,
-                    outline: "none",
-                  }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: "block", fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>
-                  Preferred Location
-                </label>
-                <input
-                  type="text"
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  placeholder="e.g. Tamil Nadu, India"
                   style={{
                     width: "100%",
                     background: "var(--bg-elevated)",
@@ -282,28 +257,6 @@ export default function SummaryPage() {
                     </option>
                   ))}
                 </select>
-              </div>
-
-              <div>
-                <label style={{ display: "block", fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>
-                  Preferred Language
-                </label>
-                <input
-                  type="text"
-                  value={language}
-                  onChange={(e) => setLanguage(e.target.value)}
-                  placeholder="e.g. English"
-                  style={{
-                    width: "100%",
-                    background: "var(--bg-elevated)",
-                    border: "1px solid var(--border)",
-                    borderRadius: "var(--radius-sm)",
-                    color: "var(--text-primary)",
-                    padding: "8px 12px",
-                    fontSize: 13,
-                    outline: "none",
-                  }}
-                />
               </div>
             </div>
 
@@ -380,7 +333,6 @@ export default function SummaryPage() {
           >
             <div>
               Personalised for <strong>{prefs.user_name ?? "User"}</strong>
-              {prefs.preferred_location ? ` · ${prefs.preferred_location}` : ""}
               {prefs.news_categories?.length ? ` · ${prefs.news_categories.join(", ")}` : ""}
             </div>
             <button

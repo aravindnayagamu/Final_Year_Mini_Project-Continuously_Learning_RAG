@@ -168,10 +168,9 @@ export interface NewsSummary {
 
 export interface UserPreferences {
   user_name?: string;
-  preferred_location?: string;
   news_categories?: string[];
   specific_interests?: string[];
   summary_detail?: string;
   topics_to_avoid?: string[];
-  preferred_language?: string;
 }
+

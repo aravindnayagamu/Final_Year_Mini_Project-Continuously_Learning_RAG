@@ -179,5 +179,7 @@ def save_user_preferences(preferences: Dict[str, Any]) -> Dict[str, Any]:
     path = settings.app_dir / "user_preferences.json"
     existing = get_user_preferences()
     existing.update(preferences)
+    existing.pop("preferred_location", None)
+    existing.pop("preferred_language", None)
     path.write_text(json.dumps(existing, ensure_ascii=False, indent=2), encoding="utf-8")
     return existing

@@ -1,4 +1,9 @@
 import os
+os.environ["USE_TF"] = "0"
+os.environ["TRANSFORMERS_NO_TF"] = "1"
+os.environ["USE_TORCH"] = "1"
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
+
 from pathlib import Path
 from dotenv import load_dotenv
 import time

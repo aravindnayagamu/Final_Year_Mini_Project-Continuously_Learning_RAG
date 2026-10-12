@@ -1,4 +1,6 @@
 import time
+import os
+from dotenv import load_dotenv
 import logging
 import urllib.request
 import feedparser
@@ -23,9 +25,14 @@ logging.basicConfig(
     format="%(asctime)s - %(threadName)s - %(levelname)s - %(message)s"
 )
 
+ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
+load_dotenv(dotenv_path=ENV_FILE)
+load_dotenv()
+
 CUR_DIR = Path(__file__).resolve().parent
 PROJECT_DIR = CUR_DIR.parent
-DATA_DIR = CUR_DIR / "news_database" / "unread"
+app_dir_name = os.getenv("APP_DIR", "app")
+DATA_DIR = PROJECT_DIR / app_dir_name / "news_database" / "unread"
 
 TRACKER_DB = PROJECT_DIR / "tracker.db"
 METADATA_DB = PROJECT_DIR / "metadata.db"
@@ -447,11 +454,12 @@ if __name__ == "__main__":
 
     run_all_scrapers()
 
-    schedule.every(20).minutes.do(run_all_scrapers)
+    fetch_interval = int(os.getenv("FETCH_INTERVAL_MINUTES", "20"))
+    schedule.every(fetch_interval).minutes.do(run_all_scrapers)
 
     logging.info("Scheduler is active.")
 
-    logging.info("Next fetch will happen in 20 minutes.")
+    logging.info(f"Next fetch will happen in {fetch_interval} minutes.")
 
     try:
         while True:

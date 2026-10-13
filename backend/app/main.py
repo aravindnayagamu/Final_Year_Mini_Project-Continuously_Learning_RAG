@@ -16,7 +16,7 @@ from app.core.limiter import limiter
 from app.core.redis import close_redis
 from app.db.models import Base
 from app.db.session import engine
-from app.api.routes import health, query, documents, ingest, research, pipeline
+from app.api.routes import health, query, documents, ingest, research, pipeline, users
 from app.workers import scheduler
 
 setup_logging()
@@ -73,6 +73,7 @@ app.include_router(documents.router, prefix=PREFIX)
 app.include_router(ingest.router, prefix=PREFIX)
 app.include_router(research.router, prefix=PREFIX)
 app.include_router(pipeline.router, prefix=PREFIX)
+app.include_router(users.router, prefix=f"{PREFIX}/users")
 
 logger.debug("All routers registered under %s", PREFIX)
 

@@ -94,3 +94,13 @@ export const getSummaryPreferences = (): Promise<UserPreferences> =>
 
 export const updateSummaryPreferences = (payload: UserPreferences): Promise<UserPreferences> =>
   api.post<UserPreferences>("/summary/preferences", payload).then((r) => r.data);
+
+export const syncUser = (payload: {
+  id: string;
+  email?: string;
+  name?: string;
+  first_name?: string;
+  last_name?: string;
+  image_url?: string;
+}): Promise<any> =>
+  api.post("/users/sync", payload).then((r) => r.data);

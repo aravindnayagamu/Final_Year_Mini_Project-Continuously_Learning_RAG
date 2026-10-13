@@ -1006,3 +1006,33 @@ tbody td {
   overflow: hidden;
   background: var(--bg-base);
 }
+
+/* Clerk Social Buttons White Font Overrides */
+.cl-socialButtonsBlockButton,
+.cl-socialButtonsBlockButton__google,
+.cl-socialButtonsBlockButtonText,
+button[data-provider="google"],
+button[data-provider="google"] span,
+.cl-socialButtonsBlockButton span,
+.cl-socialButtonsBlockButton p {
+  color: #ffffff !important;
+  fill: #ffffff !important;
+  font-weight: 500 !important;
+}
+
+.cl-socialButtonsBlockButton,
+.cl-socialButtonsBlockButton__google,
+button[data-provider="google"] {
+  background-color: #1e293b !important;
+  border: 1px solid #334155 !important;
+}
+
+.cl-socialButtonsBlockButton:hover,
+.cl-socialButtonsBlockButton__google:hover,
+button[data-provider="google"]:hover {
+  background-color: #334155 !important;
+}
+
+.cl-socialButtonsBlockButtonText {
+  color: #ffffff !important;
+}

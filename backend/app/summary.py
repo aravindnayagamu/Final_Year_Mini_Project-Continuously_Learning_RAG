@@ -88,14 +88,60 @@ except ImportError:
 
 
 SOURCES_BY_CATEGORY = {
-    "NATIONAL NEWS": ["Hindu_India", "TOI_India", "IE_India", "PIB_India"],
-    "STATE / DISTRICT NEWS": ["Hindu_TamilNadu", "NDTV_South", "Hindu_Chennai", "TOI_Delhi", "TOI_Bengaluru"],
-    "POLITICAL NEWS": ["IE_Political_Pulse", "News18_Politics", "ThePrint_Politics", "NDTV_India", "Politico_Top", "BBC_Politics", "Guardian_Politics"],
-    "INTERNATIONAL NEWS": ["BBC_World", "Guardian_World", "AlJazeera_All"],
-    "SPORTS": ["ESPNcricinfo_Top", "Sportstar_Top", "BBC_Sport"],
-    "TECHNOLOGY": ["TheVerge", "TechCrunch", "Wired"],
-    "FINANCIAL / BUSINESS NEWS": ["EconomicTimes_Top", "LiveMint_Top", "MoneyControl_Top"],
-    "ENTERTAINMENT NEWS": ["BollywoodHungama", "Variety", "Hindu_Cinema", "ABPLive_Entertainment"],
+    "NATIONAL NEWS": [
+        "IE_India", "HT_India", "ABPLive_India", "IndiaToday_India", "TOI_Top_Stories",
+        "DeccanChronicle_Top", "Scroll_Top", "Firstpost_Top", "News18_Top", "NDTV_Top_Stories",
+        "Hindu_Top", "FreePressJournal_Top", "Hindu_India", "TOI_India", "NDTV_Trending_Stories"
+    ],
+    "STATE / DISTRICT NEWS": [
+        "IE_Chennai", "HT_Cities", "Hindu_Karnataka", "Hindu_Kerala", "Hindu_Telangana",
+        "IE_Cities", "TOI_Chennai", "TOI_Delhi", "TOI_Bengaluru", "TOI_Kolkata",
+        "TOI_Mumbai", "TheHindu_Kolkata", "NDTV_Cities", "NDTV_South", "Hindu_TamilNadu",
+        "Hindu_Chennai", "TheHindu_Mumbai", "TheHindu_Bengaluru", "TheHindu_Delhi", "TheHindu_Madurai",
+        "TheHindu_Coimbatore"
+    ],
+    "POLITICAL NEWS": [
+        "IE_Political", "News18_Politics", "IndiaToday_Politics", "LiveMint_Politics",
+        "Bloomberg_Politics", "IE_Political_Pulse", "SkyNews_Politics", "BBC_Politics",
+        "Guardian_Politics", "ThePrint_Politics", "NDTV_India", "Politico_Top",
+        "TOI_Top_Stories", "DeccanChronicle_Top", "IE_India", "HT_India"
+    ],
+    "INTERNATIONAL NEWS": [
+        "Economist_Asia", "IE_World", "DW_Top", "HT_World", "TheDiplomat",
+        "Economist_World", "NYT_World", "StraitsTimes_Asia", "StraitsTimes_World",
+        "Guardian_World", "JapanTimes", "BBC_Top", "CNN_World", "AlJazeera_All",
+        "ABC_Australia", "ABC_US", "BBC_World", "France24_Top", "Dawn_World",
+        "DW_World", "DW_Asia", "NPR_World", "SkyNews_World", "IndiaToday_World"
+    ],
+    "SPORTS": [
+        "News18_Sports", "News18_Cricket", "ESPNcricinfo_Top", "IE_Sports", "BBC_Football",
+        "Dawn_Sport", "HT_Sports", "Sportskeeda_Football", "ScmpSport", "StraitsTimes_Sport",
+        "Sportstar_Cricket", "Sportstar_Top", "ESPN_Top", "HT_Cricket", "Sportstar_Football",
+        "NDTV_Sports", "IndiaToday_Sports", "BBC_Sport", "Skysports_Cricket", "Skysports_Top",
+        "Skysports_Tennis", "Skysports_F1", "Livemint_Cricket", "Hindu_Cricket", "Hindu_Sport"
+    ],
+    "TECHNOLOGY": [
+        "IE_Technology", "News18_Tech", "NDTV_Tech", "Mashable", "ScmpTech",
+        "LiveMint_Technology", "CBS_Tech", "CNET", "Inc42", "BBC_Tech",
+        "ArsTechnica", "Engadget", "Gizmodo", "IndiaToday_Technology", "TechCrunch",
+        "Bloomberg_Tech", "TheVerge", "Wired", "HT_Tech", "EconomicTimes_Tech",
+        "SkyNews_Tech", "Medianama", "Beebom"
+    ],
+    "FINANCIAL / BUSINESS NEWS": [
+        "Economist_Business", "IE_Business", "News18_Business", "Dawn_Business",
+        "BusinessLine_Top", "EconomicTimes_Industry", "EconomicTimes_Markets", "Guardian_Business",
+        "LiveMint_Markets", "LiveMint_Companies", "LiveMint_Top", "StraitsTimes_Business",
+        "NDTV_Business", "TOI_Business", "MoneyControl_Business", "MoneyControl_Top",
+        "EconomicTimes_Top", "BusinessStandard_Top", "BusinessStandard_Markets", "IndiaToday_Business",
+        "HT_Business", "NPR_Business"
+    ],
+    "ENTERTAINMENT NEWS": [
+        "Firstpost_Entertainment", "IE_Tamil_Cinema", "News18_Tamil_Cinema", "NDTV_Movies",
+        "Hindu_Entertainment", "Guardian_Culture", "ABPLive_Entertainment", "TOI_Entertainment",
+        "HT_Entertainment", "IndiaToday_Movies", "BollywoodHungama", "Variety", "Hindu_Cinema",
+        "News18_Movies", "SkyNews_Entertainment", "HT_Cinema", "IE_Entertainment", "Deadline",
+        "Billboard", "HollywoodReporter"
+    ],
 }
 
 NEWS_CATEGORIES = {
@@ -137,6 +183,22 @@ def _parse_item_dt(value):
         return None
 
 
+def is_readable_text(text: str) -> bool:
+    if not text:
+        return False
+    stripped = text.strip()
+    if len(stripped) < 80:
+        return False
+    q_count = stripped.count("?")
+    block_count = stripped.count("■") + stripped.count("█")
+    if q_count > len(stripped) * 0.12 or block_count > 5:
+        return False
+    ascii_alpha = sum(1 for c in stripped if 'a' <= c.lower() <= 'z')
+    if ascii_alpha < 30 or (ascii_alpha / len(stripped)) < 0.35:
+        return False
+    return True
+
+
 def retrieve_category_news(store, category_name, category_query, k=5, source="recent"):
     start_time = time.perf_counter()
     srcs = SOURCES_BY_CATEGORY.get(category_name, [])
@@ -145,17 +207,18 @@ def retrieve_category_news(store, category_name, category_query, k=5, source="re
     cutoff_3d = now - timedelta(days=3)
 
     docs = []
+    candidates_24h = []
+    candidates_3d = []
+
     try:
         res = store._collection.get(
             where={"source_name": {"$in": srcs}} if srcs else None,
-            limit=30,
+            limit=50,
             include=["documents", "metadatas"]
         )
-        candidates_24h = []
-        candidates_3d = []
         for i, meta in enumerate(res.get("metadatas", [])):
             text = res["documents"][i]
-            if len(text.strip()) < 80:
+            if not is_readable_text(text):
                 continue
             dt = _parse_item_dt(meta.get("paper_retrieval_time"))
             d = LangchainDocument(page_content=text, metadata=dict(meta))
@@ -163,46 +226,79 @@ def retrieve_category_news(store, category_name, category_query, k=5, source="re
                 candidates_24h.append(d)
             elif dt and dt >= cutoff_3d:
                 candidates_3d.append(d)
-
-        if candidates_24h:
-            docs = candidates_24h[:k]
-            for d in docs:
-                d.metadata["timeframe"] = "Last 24 Hours"
-        elif candidates_3d:
-            docs = candidates_3d[:k]
-            for d in docs:
-                d.metadata["timeframe"] = "Past 3 Days"
-        elif source == "recent":
-            try:
-                res_h = historical_store._collection.get(
-                    where={"source_name": {"$in": srcs}} if srcs else None,
-                    limit=25,
-                    include=["documents", "metadatas"]
-                )
-                for i, meta in enumerate(res_h.get("metadatas", [])):
-                    text = res_h["documents"][i]
-                    if len(text.strip()) < 80:
-                        continue
-                    dt = _parse_item_dt(meta.get("paper_retrieval_time"))
-                    if dt and dt >= cutoff_3d:
-                        d = LangchainDocument(page_content=text, metadata=dict(meta))
-                        d.metadata["timeframe"] = "Past 3 Days"
-                        candidates_3d.append(d)
-                if candidates_3d:
-                    docs = candidates_3d[:k]
-            except Exception:
-                pass
+            else:
+                candidates_3d.append(d)
     except Exception:
         pass
 
-    if not docs:
+    if len(candidates_24h) >= k:
+        docs = candidates_24h[:k]
+        for d in docs:
+            d.metadata["timeframe"] = "Last 24 Hours"
+    elif len(candidates_24h) + len(candidates_3d) >= k:
+        docs = (candidates_24h + candidates_3d)[:k]
+        for d in docs:
+            d.metadata["timeframe"] = "Past 3 Days" if d not in candidates_24h else "Last 24 Hours"
+    elif candidates_24h or candidates_3d:
+        docs = list(candidates_24h + candidates_3d)
+
+    if len(docs) < k and source == "recent":
         try:
-            results = store.similarity_search_with_score(category_query, k=k)
-            for doc, score in results:
-                doc.metadata["distance"] = score
-                docs.append(doc)
+            res_h = historical_store._collection.get(
+                where={"source_name": {"$in": srcs}} if srcs else None,
+                limit=30,
+                include=["documents", "metadatas"]
+            )
+            for i, meta in enumerate(res_h.get("metadatas", [])):
+                text = res_h["documents"][i]
+                if not is_readable_text(text):
+                    continue
+                d = LangchainDocument(page_content=text, metadata=dict(meta))
+                d.metadata["timeframe"] = "Historical Archive"
+                docs.append(d)
+                if len(docs) >= k:
+                    break
         except Exception:
-            docs = store.similarity_search(category_query, k=k)
+            pass
+
+    if len(docs) < k:
+        needed = k - len(docs)
+        try:
+            sim_results = store.similarity_search_with_score(category_query, k=needed * 3)
+            for doc, score in sim_results:
+                if not is_readable_text(doc.page_content):
+                    continue
+                doc.metadata["distance"] = score
+                if "timeframe" not in doc.metadata:
+                    dt = _parse_item_dt(doc.metadata.get("paper_retrieval_time"))
+                    if dt and dt >= cutoff_24h:
+                        doc.metadata["timeframe"] = "Last 24 Hours"
+                    elif dt and dt >= cutoff_3d:
+                        doc.metadata["timeframe"] = "Past 3 Days"
+                    else:
+                        doc.metadata["timeframe"] = "Archive"
+                docs.append(doc)
+                if len(docs) >= k:
+                    break
+        except Exception:
+            pass
+
+    if len(docs) < k and source == "recent":
+        needed = k - len(docs)
+        try:
+            sim_hist = historical_store.similarity_search(category_query, k=needed * 3)
+            for doc in sim_hist:
+                if not is_readable_text(doc.page_content):
+                    continue
+                if "timeframe" not in doc.metadata:
+                    doc.metadata["timeframe"] = "Historical Archive"
+                docs.append(doc)
+                if len(docs) >= k:
+                    break
+        except Exception:
+            pass
+
+    docs = remove_duplicates(docs)[:k]
 
     elapsed_ms = (time.perf_counter() - start_time) * 1000
 
@@ -354,8 +450,13 @@ IMPORTANT RULES:
    organizations and other factual details present in
    the source.
 
-8. For each news category, present the news from the last 24 hours. If the context for a category notes that news was fetched from the past 3 days (fallback), present the news from the past 3 days and clearly mention the timeframe. Only if no news was found even within the past 3 days, write:
-   "No relevant news found in the last 3 days."
+8. For each news category, present real, informative, and engaging news stories.
+   CRITICAL REQUIREMENT - NEVER OUTPUT "NO RELEVANT NEWS FOUND":
+   - Do NOT output "No relevant news found", "No relevant news", or any similar placeholder under ANY category. The user strictly forbids this message.
+   - Every single category subsection MUST contain actual, well-written news stories.
+   - Use the retrieved news chunks provided under that category (or broader relevant context from other chunks/categories in the context) to synthesize informative news developments.
+   - If a story's topic is broad or comes from an archive timeframe, adapt and synthesize it under the relevant category so the user always has insightful news to read.
+   - Never leave any category empty or with an apology/disclaimer.
 
 Organize the output into these sections, keeping recent and historical news separate:
 
@@ -366,7 +467,7 @@ Include subsections for each provided category: NATIONAL NEWS, STATE / DISTRICT 
 Include subsections for each provided category with relevant historical context.
 
 Clearly identify the download timestamp and source when available. Do not describe historical
-news as breaking or current. If a section has no relevant results, say so.
+news as breaking or current. Every section must have engaging news stories; never write that there are no results.
 
 USER PREFERENCES:
 

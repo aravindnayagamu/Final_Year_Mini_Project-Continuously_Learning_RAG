@@ -69,10 +69,10 @@ flowchart TD
 
 ### 1. Dual Vector Store & Continual Separation
 
-To prevent stale news from diluting breaking developments, the platform separates vector embeddings into two distinct ChromaDB collections:
+To prevent stale news from diluting breaking developments, the platform separates vector embeddings into two distinct ChromaDB collections backed by SQLite (`chroma.sqlite3`) as the vector storage engine:
 
-- `recent_news_docs`: Contains articles published or ingested within the active retention window (24 hours to 3 days).
-- `historical_news_docs`: Contains archived news beyond 24 hours.
+- `recent_news_docs`: Contains articles published or ingested within the active retention window (24 hours to 3 days) stored in `app/vector_db/chroma.sqlite3`.
+- `historical_news_docs`: Contains archived news beyond 24 hours stored in `app/historical_vector_db/chroma.sqlite3`.
   An automated separation pipeline migrates older embeddings from the active collection to the historical archive, maintaining high retrieval precision for current events while preserving historical context.
 
 ### 2. Automated RSS Ingestion Pipeline
@@ -80,10 +80,10 @@ To prevent stale news from diluting breaking developments, the platform separate
 Background ingestion runs every 20 minutes (or on manual trigger):
 
 - Fetches articles from verified news sources including National, State, Politics, World, Technology, Business, Sports, and Entertainment feeds.
-- Deduplicates article URLs using SHA-256 hashes in `tracker.db`.
+- Deduplicates article URLs using SHA-256 hashes in `tracker.db` (SQLite).
 - Formats article texts into structured PDF documents using ReportLab.
 - Extracts text via PyPDF and splits it into semantic chunks with LangChain RecursiveCharacterTextSplitter.
-- Embeds chunks with `sentence-transformers/all-MiniLM-L6-v2` and commits them to ChromaDB.
+- Embeds chunks with `sentence-transformers/all-MiniLM-L6-v2` and commits them to ChromaDB SQLite vector storage.
 - Stores document metadata, chunk counts, timestamps, and ingestion run stats in PostgreSQL.
 
 ### 3. Personal News Feed Generation
@@ -126,7 +126,8 @@ The Personal News Feed synthesizes customized multi-category digests:
 - Framework: FastAPI, Uvicorn
 - Asynchronous DB Engine: SQLAlchemy with AsyncPG
 - Relational Database: PostgreSQL 14+
-- Vector Database: ChromaDB (SQLite + HNSW index)
+- Vector Database: ChromaDB (SQLite 3.35+ persistence engine + HNSW index)
+- Local Tracking Database: SQLite 3 (`tracker.db`, `metadata.db`)
 - Task Queue & Scheduler: Celery, Redis (Upstash or local), APScheduler
 - Embedding Model: HuggingFace `sentence-transformers/all-MiniLM-L6-v2`
 - Large Language Model: Google Gemini API (`google-genai` SDK)
@@ -325,17 +326,18 @@ VITE_CLERK_PUBLISHABLE_KEY=pk_test_your_clerk_publishable_key
 1. Python 3.11, 3.12, or 3.13 installed.
 2. Node.js 18.x or higher and npm installed.
 3. PostgreSQL 14+ running locally or through Docker.
-4. Redis instance running locally or via cloud provider (e.g., Upstash Redis).
-5. A Google Gemini API Key from Google AI Studio.
-6. A Clerk application configured with Google or Email authentication.
+4. SQLite 3 (version 3.35.0 or higher) installed on the system (required as the underlying storage engine for ChromaDB vector databases `vector_db` and `historical_vector_db`, as well as URL tracking `tracker.db` and metadata cache `metadata.db`).
+5. Redis instance running locally or via cloud provider (e.g., Upstash Redis).
+6. A Google Gemini API Key from Google AI Studio.
+7. A Clerk application configured with Google or Email authentication.
 
 ---
 
 ### Step 1: Clone the Repository
 
 ```bash
-git clone https://github.com/your-username/Continual_RAG.git
-cd Continual_RAG
+git clone https://github.com/aravindnayagamu/Final_Year_Mini_Project-Continuously_Learning_RAG.git
+cd Final_Year_Mini_Project-Continuously_Learning_RAG
 ```
 
 ---

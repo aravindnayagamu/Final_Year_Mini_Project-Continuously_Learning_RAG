@@ -120,12 +120,13 @@ export default function ChatPage() {
             )}
             <button
               className="btn btn-secondary btn-sm"
+              style={{ color: "#0b0f19", fontWeight: 600 }}
               onClick={handlePullNews}
               disabled={pullingNews}
             >
               {pullingNews ? (
                 <>
-                  <span className="spin">⟳</span> Pulling News…
+                  <span className="spin" style={{ color: "#0b0f19" }}>⟳</span> Pulling News…
                 </>
               ) : (
                 <>Pull Latest News</>

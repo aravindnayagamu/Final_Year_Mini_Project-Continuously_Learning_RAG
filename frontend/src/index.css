@@ -471,6 +471,26 @@ tbody td {
   color: #ffffff;
 }
 
+.btn-secondary {
+  background: #ffffff;
+  color: #0b0f19 !important;
+  font-weight: 600;
+  border: 1px solid #ffffff;
+}
+
+.btn-secondary,
+.btn-secondary *,
+.btn-secondary span,
+.btn-secondary svg {
+  color: #0b0f19 !important;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #f1f5f9;
+  color: #0b0f19 !important;
+  border-color: #f1f5f9;
+}
+
 .btn-sm {
   padding: 7px 14px;
   font-size: 13.5px;
@@ -976,6 +996,10 @@ tbody td {
 .paper-item-info {
   overflow: hidden;
   flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .paper-item-name {

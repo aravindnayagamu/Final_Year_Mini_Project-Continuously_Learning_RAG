@@ -139,6 +139,10 @@ def separate_data():
         document = batch["documents"][i]
         metadata = dict(batch["metadatas"][i] or {})
 
+        # Not moving research paper documents to historical news
+        if metadata.get("doc_type") == "research_paper":
+            continue
+
         timestamp = lookup_download_time(metadata)
         parsed = parse_timestamp(timestamp)
 

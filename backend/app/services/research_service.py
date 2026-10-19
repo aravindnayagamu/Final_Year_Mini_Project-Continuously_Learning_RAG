@@ -24,7 +24,7 @@ from app.schemas.research import (
 )
 from app.services import cache_service, metadata_service
 from app.services.rag_service import _get_gemini_client
-from app.retrive import vector_store
+from app.retrive import recent_store, historical_store
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -76,7 +76,8 @@ async def process_and_store_paper(
             })
 
     if texts:
-        vector_store.add_texts(texts=texts, metadatas=metadatas)
+        ids = [f"{paper_id}_{i}" for i in range(len(texts))]
+        recent_store.add_texts(texts=texts, metadatas=metadatas, ids=ids)
 
     title = filename.rsplit(".", 1)[0]
     async with AsyncSessionLocal() as db:
@@ -125,10 +126,11 @@ async def get_research_papers() -> List[ResearchPaperOut]:
 
 
 async def delete_research_paper(paper_id: str) -> bool:
-    try:
-        vector_store._collection.delete(where={"paper_id": paper_id})
-    except Exception as exc:
-        logger.warning("Could not delete Chroma vectors for %s: %s", paper_id, exc)
+    for store in (recent_store, historical_store):
+        try:
+            store._collection.delete(where={"paper_id": paper_id})
+        except Exception as exc:
+            logger.warning("Could not delete Chroma vectors for %s from store: %s", paper_id, exc)
 
     async with AsyncSessionLocal() as db:
         await db.execute(
@@ -168,6 +170,32 @@ def _is_unavailable_response(answer: str, context_chunks: int, sources: list) ->
     return any(phrase in lower for phrase in negative_phrases)
 
 
+def _search_store_candidates(
+    store,
+    question: str,
+    n_results: int,
+    where_filter: Optional[dict] = None,
+) -> List[tuple[str, dict, float]]:
+    try:
+        kwargs = {
+            "query_texts": [question],
+            "n_results": n_results,
+            "include": ["documents", "metadatas", "distances"],
+        }
+        if where_filter:
+            kwargs["where"] = where_filter
+        res = store._collection.query(**kwargs)
+        if not res or not res.get("documents") or len(res["documents"]) == 0:
+            return []
+        docs = res["documents"][0]
+        metas = res["metadatas"][0] if res.get("metadatas") else [{}] * len(docs)
+        dists = res["distances"][0] if res.get("distances") else [0.0] * len(docs)
+        return list(zip(docs, metas, dists))
+    except Exception as exc:
+        logger.warning("Vector search on store failed: %s", exc)
+        return []
+
+
 async def query_research(
     question: str,
     paper_id: Optional[str] = None,
@@ -195,48 +223,105 @@ async def query_research(
             )
 
     t0 = time.perf_counter()
-    where_filter = {"paper_id": paper_id} if paper_id else {"doc_type": "research_paper"}
+    candidates: List[tuple[str, dict, float]] = []
 
-    try:
-        results = vector_store._collection.query(
-            query_texts=[question],
-            n_results=k,
-            where=where_filter,
-            include=["documents", "metadatas", "distances"],
+    all_registered_papers = await get_research_papers()
+    if not all_registered_papers:
+        return ResearchQueryResponse(
+            question=question,
+            answer="No research papers have been uploaded yet. Please upload a PDF research paper to begin.",
+            sources=[],
+            retrieval_time_ms=(time.perf_counter() - t0) * 1000,
+            context_chunks=0,
+            model_used=settings.gemini_model,
+            created_at=datetime.now(timezone.utc).isoformat(),
         )
-    except Exception as exc:
-        logger.warning("Vector search with filter failed, falling back: %s", exc)
-        results = vector_store._collection.query(
-            query_texts=[question],
-            n_results=k,
-            include=["documents", "metadatas", "distances"],
-        )
+
+    if paper_id:
+        where_filter = {"paper_id": paper_id}
+        for store in (recent_store, historical_store):
+            candidates.extend(_search_store_candidates(store, question, k * 2, where_filter))
+    else:
+        # Cross-paper synthesis across all uploaded papers
+        k_per_paper = max(3, k)
+        for p in all_registered_papers:
+            p_filter = {"paper_id": p.paper_id}
+            # Similarity search for that paper
+            for store in (recent_store, historical_store):
+                candidates.extend(_search_store_candidates(store, question, k_per_paper, p_filter))
+            # Guarantee intro chunk for each paper
+            for store in (recent_store, historical_store):
+                try:
+                    intro = store._collection.get(where={"paper_id": p.paper_id}, limit=1)
+                    if intro and intro.get("documents") and len(intro["documents"]) > 0:
+                        candidates.append((
+                            intro["documents"][0],
+                            intro["metadatas"][0] if intro.get("metadatas") else {"source": p.file_name, "paper_id": p.paper_id},
+                            0.20,
+                        ))
+                        break
+                except Exception:
+                    pass
+
+        # Query across all research papers globally
+        for store in (recent_store, historical_store):
+            candidates.extend(_search_store_candidates(store, question, k * 3, {"doc_type": "research_paper"}))
 
     retrieval_time = time.perf_counter() - t0
     retrieval_time_ms = retrieval_time * 1000
 
-    relevance_fn = vector_store._select_relevance_score_fn()
+    relevance_fn = recent_store._select_relevance_score_fn()
+
+    # Deduplicate candidate chunks by text snippet
+    seen_texts = set()
+    unique_candidates: List[tuple[str, dict, float]] = []
+    for doc_str, meta, dist in candidates:
+        key = doc_str.strip()
+        if key and key not in seen_texts:
+            seen_texts.add(key)
+            unique_candidates.append((doc_str, meta, dist))
+
+    # Sort by distance (lowest distance = highest similarity)
+    unique_candidates.sort(key=lambda x: x[2])
+
+    # In cross-paper synthesis, guarantee that each paper gets representation
+    if not paper_id and all_registered_papers:
+        paper_top_map: dict[str, list[tuple[str, dict, float]]] = {p.paper_id: [] for p in all_registered_papers}
+        for doc_str, meta, dist in unique_candidates:
+            pid = meta.get("paper_id")
+            if pid in paper_top_map and len(paper_top_map[pid]) < 3:
+                paper_top_map[pid].append((doc_str, meta, dist))
+
+        selected_set = set()
+        guaranteed_candidates: List[tuple[str, dict, float]] = []
+        for pid, plist in paper_top_map.items():
+            for c in plist:
+                selected_set.add(c[0].strip())
+                guaranteed_candidates.append(c)
+
+        remaining_candidates = [c for c in unique_candidates if c[0].strip() not in selected_set]
+        max_total = max(len(all_registered_papers) * 4, 10)
+        top_candidates = guaranteed_candidates + remaining_candidates[:max(0, max_total - len(guaranteed_candidates))]
+    else:
+        top_candidates = unique_candidates[:k]
+
     sources: List[SourceChunk] = []
-    context_chunks_text: List[str] = []
+    context_blocks: List[str] = []
 
-    if results and results.get("documents") and len(results["documents"]) > 0:
-        docs = results["documents"][0]
-        metas = results["metadatas"][0] if results.get("metadatas") else [{}] * len(docs)
-        dists = results["distances"][0] if results.get("distances") else [0.0] * len(docs)
-
-        for doc_str, meta, dist in zip(docs, metas, dists):
-            rel = relevance_fn(dist)
-            sources.append(
-                SourceChunk(
-                    document=doc_str,
-                    source=meta.get("source", "Research Paper"),
-                    relevance=float(rel),
-                    distance=float(dist),
-                )
+    for doc_str, meta, dist in top_candidates:
+        rel = relevance_fn(dist)
+        source_name = meta.get("source", "Research Paper")
+        sources.append(
+            SourceChunk(
+                document=doc_str,
+                source=source_name,
+                relevance=float(rel),
+                distance=float(dist),
             )
-            context_chunks_text.append(doc_str)
+        )
+        context_blocks.append(f"[Document: {source_name}]\n{doc_str}")
 
-    merged_context = "\n\n".join(context_chunks_text)
+    merged_context = "\n\n".join(context_blocks)
 
     if not merged_context:
         answer = "I could not find relevant information in the uploaded research paper(s)."
@@ -244,6 +329,7 @@ async def query_research(
         prompt = (
             "You are an expert AI research assistant.\n"
             "Answer the question accurately based on the research paper context provided below.\n"
+            "When performing cross-paper synthesis or answering questions about multiple papers, synthesize findings and clearly refer to each paper by name.\n"
             "Cite methodology, findings, data, or experimental setup where relevant.\n"
             "If the answer cannot be found in the context, state that clearly.\n\n"
             f"Context:\n{merged_context}\n\n"

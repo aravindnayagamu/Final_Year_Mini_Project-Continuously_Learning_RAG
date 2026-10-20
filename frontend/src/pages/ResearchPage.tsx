@@ -181,12 +181,13 @@ export default function ResearchPage() {
         actions={
           <button
             className="btn btn-secondary btn-sm"
+            style={{ color: "#0b0f19", fontWeight: 600 }}
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
           >
             {uploading ? (
               <>
-                <span className="spin">⟳</span> Uploading…
+                <span className="spin" style={{ color: "#0b0f19" }}>⟳</span> Uploading…
               </>
             ) : (
               <>+ Upload Paper</>
@@ -240,8 +241,10 @@ export default function ResearchPage() {
               className={`paper-item-btn ${selectedPaperId === null ? "active" : ""}`}
               onClick={() => setSelectedPaperId(null)}
             >
-              <div className="paper-item-name">All Uploaded Papers</div>
-              <div className="paper-item-sub">Cross-paper synthesis</div>
+              <div className="paper-item-info">
+                <div className="paper-item-name">All Uploaded Papers</div>
+                <div className="paper-item-sub">Cross-paper synthesis</div>
+              </div>
             </button>
 
             {loadingPapers ? (

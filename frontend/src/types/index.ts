@@ -111,3 +111,66 @@ export interface ResearchQueryResponse {
   model_used: string | null;
   created_at: string;
 }
+export interface NewsSource {
+  source_name: string;
+  group: string;
+  url: string;
+  document_count: number;
+  last_fetched: string | null;
+}
+
+export interface SourcesResponse {
+  total_sources: number;
+  groups: Record<string, number>;
+  sources: NewsSource[];
+}
+
+export interface RetrievalMetrics {
+  updated_at: string | null;
+  relevance: { total: number; relevant: number; relevance_score: number };
+  "precision@6": { queries: number; total: number; relevant: number; precision_score: number | null };
+  "recall@6": { queries: number; evaluated_queries: number; recall_score: number | null; status: string };
+  contextual_precision: { queries: number; contextual_precision_score: number | null };
+  recent_precision: { total: number; relevant: number; precision_score: number };
+  historical_precision: { total: number; relevant: number; precision_score: number };
+  temporal_assignment: { verified: number; correct: number; accuracy_score: number | null; unknown_timestamp_count: number };
+  retrieval_latency_ms: { count: number; last: number | null; average: number | null; total: number };
+  chunks_retrieved: { total: number; recent: number; historical: number; unknown_source: number };
+  last_call: {
+    query: string;
+    source: string;
+    retrieved: number;
+    relevant_estimate: number;
+    relevance_score: number;
+    retrieval_time_ms: number | null;
+  } | null;
+  methodology: Record<string, string>;
+}
+
+export interface SeparationResult {
+  historical_moved: number;
+  unknown_moved: number;
+  total_moved: number;
+  recent_retained: number;
+  ran_at: string;
+}
+
+export interface VectorStats {
+  recent_chunks: number;
+  historical_chunks: number;
+}
+
+export interface NewsSummary {
+  summary: string;
+  generated_at: string;
+  generation_time_ms: number | null;
+}
+
+export interface UserPreferences {
+  user_name?: string;
+  news_categories?: string[];
+  specific_interests?: string[];
+  summary_detail?: string;
+  topics_to_avoid?: string[];
+}
+

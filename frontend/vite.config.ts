@@ -16,6 +16,7 @@ export default defineConfig({
         target: "http://127.0.0.1:8000",
         changeOrigin: true,
         secure: false,
+        timeout: 120_000,
         configure: (proxy) => {
           // Set Connection: close so every proxied request doesn't hold
           // a persistent socket open – prevents TIME_WAIT pile-up.

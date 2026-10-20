@@ -1,5 +1,5 @@
 import logging
-
+import sqlalchemy
 from fastapi import APIRouter
 
 from app.db.session import engine
@@ -16,7 +16,6 @@ async def health_check() -> dict:
     health: dict = {"status": "ok", "services": {}}
 
     try:
-        import sqlalchemy
         async with engine.connect() as conn:
             await conn.execute(sqlalchemy.text("SELECT 1"))
         health["services"]["postgres"] = "ok"
@@ -33,7 +32,8 @@ async def health_check() -> dict:
     health["services"]["gemini_api"] = (
         "configured" if settings.gemini_api_key else "missing key"
     )
-    logger.debug("Gemini API key: %s", health["services"]["gemini_api"])
+    health["services"]["gemini_model"] = settings.gemini_model or "not configured"
+    logger.debug("Gemini API key: %s | Model: %s", health["services"]["gemini_api"], settings.gemini_model)
 
     from app.core.redis import ping_redis
     redis_ok = await ping_redis()

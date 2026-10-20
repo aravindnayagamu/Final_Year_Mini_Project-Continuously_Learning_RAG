@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Tuple
 
 from sqlalchemy import case, func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import Document, IngestionRun, QueryLog, RunStatus
+from app.db.models import Document, IngestionRun, QueryLog, RunStatus, User
 
 logger = logging.getLogger(__name__)
 
@@ -148,6 +148,25 @@ async def create_ingestion_run(
     return run
 
 
+async def fail_stale_ingestion_runs(db: AsyncSession, max_age_seconds: int) -> int:
+    cutoff = datetime.now(timezone.utc) - timedelta(seconds=max_age_seconds)
+    result = await db.execute(
+        update(IngestionRun)
+        .where(IngestionRun.status == RunStatus.running.value)
+        .where(IngestionRun.started_at < cutoff)
+        .values(
+            status=RunStatus.failed.value,
+            completed_at=datetime.now(timezone.utc),
+            error_message="Run was interrupted or exceeded the time limit.",
+        )
+    )
+    await db.flush()
+    count = result.rowcount or 0
+    if count:
+        logger.warning("Marked %d stale ingestion run(s) as failed", count)
+    return count
+
+
 async def update_ingestion_run(
     db: AsyncSession,
     run_id: int,
@@ -188,3 +207,44 @@ async def get_ingestion_run(
         select(IngestionRun).where(IngestionRun.id == run_id)
     )
     return result.scalar_one_or_none()
+
+
+async def sync_user(
+    db: AsyncSession,
+    user_id: str,
+    email: Optional[str] = None,
+    name: Optional[str] = None,
+    first_name: Optional[str] = None,
+    last_name: Optional[str] = None,
+    image_url: Optional[str] = None,
+) -> User:
+    stmt = pg_insert(User).values(
+        id=user_id,
+        email=email,
+        name=name,
+        first_name=first_name,
+        last_name=last_name,
+        image_url=image_url,
+        last_sign_in_at=datetime.now(timezone.utc),
+    )
+    stmt = stmt.on_conflict_do_update(
+        index_elements=["id"],
+        set_={
+            "email": func.coalesce(stmt.excluded.email, User.email),
+            "name": func.coalesce(stmt.excluded.name, User.name),
+            "first_name": func.coalesce(stmt.excluded.first_name, User.first_name),
+            "last_name": func.coalesce(stmt.excluded.last_name, User.last_name),
+            "image_url": func.coalesce(stmt.excluded.image_url, User.image_url),
+            "last_sign_in_at": datetime.now(timezone.utc),
+        },
+    )
+    await db.execute(stmt)
+    await db.flush()
+    result = await db.execute(select(User).where(User.id == user_id))
+    return result.scalar_one()
+
+
+async def get_user(db: AsyncSession, user_id: str) -> Optional[User]:
+    result = await db.execute(select(User).where(User.id == user_id))
+    return result.scalar_one_or_none()
+

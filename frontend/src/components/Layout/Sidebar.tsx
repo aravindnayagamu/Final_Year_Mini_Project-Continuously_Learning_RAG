@@ -1,48 +1,18 @@
-import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
-import { getHealth } from "@/api/client";
-import type { HealthResponse } from "@/types";
+import { UserButton, useUser } from "@clerk/clerk-react";
 
 const NAV_ITEMS = [
   { to: "/chat",      icon: "", label: "Chat" },
   { to: "/research",  icon: "", label: "Research Assistant" },
   { to: "/dashboard", icon: "", label: "Dashboard" },
   { to: "/ingest",    icon: "", label: "Ingestion" },
+  { to: "/summary",   icon: "", label: "Personal News Feed" },
+  { to: "/sources",   icon: "", label: "Sources" },
+  { to: "/metrics",   icon: "", label: "Metrics" },
 ];
 
 export default function Sidebar() {
-  const [health, setHealth] = useState<HealthResponse | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    const check = async () => {
-      try {
-        const h = await getHealth();
-        if (!cancelled) setHealth(h);
-      } catch {
-        if (!cancelled) setHealth(null);
-      }
-    };
-    check();
-    const id = setInterval(check, 30_000);
-    return () => { cancelled = true; clearInterval(id); };
-  }, []);
-
-  const dotClass =
-    health === null
-      ? "loading"
-      : health.status === "ok"
-      ? "ok"
-      : health.status === "degraded"
-      ? "degraded"
-      : "error";
-
-  const healthLabel =
-    health === null
-      ? "Checking…"
-      : health.status === "ok"
-      ? "All systems operational"
-      : "Service degraded";
+  const { user, isLoaded } = useUser();
 
   return (
     <aside className="sidebar">
@@ -72,10 +42,46 @@ export default function Sidebar() {
       </nav>
 
       <div className="sidebar-footer">
-        <div className="health-indicator">
-          <span className={`health-dot ${dotClass}`} />
-          <span>{healthLabel}</span>
-        </div>
+        {isLoaded && user && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              padding: "8px 10px",
+              background: "var(--bg-card)",
+              borderRadius: "var(--radius-md)",
+              border: "1px solid var(--border)",
+            }}
+          >
+            <UserButton afterSignOutUrl="/" />
+            <div style={{ overflow: "hidden", flex: 1, minWidth: 0 }}>
+              <div
+                style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: "var(--text-primary)",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {user.fullName || user.username || "User"}
+              </div>
+              <div
+                style={{
+                  fontSize: 10,
+                  color: "var(--text-muted)",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {user.primaryEmailAddress?.emailAddress ?? ""}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </aside>
   );

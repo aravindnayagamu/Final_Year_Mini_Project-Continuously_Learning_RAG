@@ -3,10 +3,14 @@
 !.env.example
 *.env
 *.bin
+*.json
+*.pickle
 
 backend/app/news_database/
 backend/app/vector_db/
 backend/app/research_database/
+backend/app/historical_vector_db
+backend/app/chroma_db
 
 node_modules/
 dist/

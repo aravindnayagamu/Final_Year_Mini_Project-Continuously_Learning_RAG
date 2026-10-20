@@ -120,12 +120,13 @@ export default function ChatPage() {
             )}
             <button
               className="btn btn-secondary btn-sm"
+              style={{ color: "#0b0f19", fontWeight: 600 }}
               onClick={handlePullNews}
               disabled={pullingNews}
             >
               {pullingNews ? (
                 <>
-                  <span className="spin">⟳</span> Pulling News…
+                  <span className="spin" style={{ color: "#0b0f19" }}>⟳</span> Pulling News…
                 </>
               ) : (
                 <>Pull Latest News</>
@@ -143,7 +144,7 @@ export default function ChatPage() {
               <p style={{ fontSize: 13, color: "var(--text-muted)", maxWidth: 460 }}>
                 Your questions are answered using articles continuously fetched from live news feeds and stored in ChromaDB.
               </p>
-              <button
+              {/* <button
                 className="btn btn-primary btn-sm"
                 style={{ marginTop: 16 }}
                 onClick={handlePullNews}
@@ -156,7 +157,7 @@ export default function ChatPage() {
                 ) : (
                   <>Pull Latest News Now</>
                 )}
-              </button>
+              </button> */}
             </div>
           </div>
         ) : (

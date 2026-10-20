@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 from typing import List
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
@@ -16,6 +17,7 @@ router = APIRouter()
 settings = get_settings()
 
 _ingestion_lock = asyncio.Lock()
+_last_runs_log_time: float = 0.0
 
 
 @router.post("/ingest", response_model=IngestResponse, tags=["Ingestion"])
@@ -64,7 +66,13 @@ async def trigger_ingestion(
 async def list_ingestion_runs(
     db: AsyncSession = Depends(get_db),
 ) -> List[IngestionRunOut]:
-    logger.info("GET /ingest/runs")
+    global _last_runs_log_time
+    now = time.time()
+    if now - _last_runs_log_time >= 60.0:
+        logger.info("GET /ingest/runs")
+        _last_runs_log_time = now
+    else:
+        logger.debug("GET /ingest/runs")
     runs = await metadata_service.get_ingestion_runs(db, limit=20)
     return [IngestionRunOut.model_validate(r) for r in runs]
 

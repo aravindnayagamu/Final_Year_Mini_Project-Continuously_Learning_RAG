@@ -11,6 +11,12 @@ import type {
   ResearchUploadResponse,
   ResearchQueryRequest,
   ResearchQueryResponse,
+  SourcesResponse,
+  RetrievalMetrics,
+  VectorStats,
+  SeparationResult,
+  NewsSummary,
+  UserPreferences,
 } from "@/types";
 
 const api = axios.create({
@@ -22,13 +28,8 @@ const api = axios.create({
 export const postQuery = (payload: QueryRequest): Promise<QueryResponse> =>
   api.post<QueryResponse>("/query", payload).then((r) => r.data);
 
-export const getDocuments = (
-  page = 1,
-  pageSize = 20
-): Promise<DocumentOut[]> =>
-  api
-    .get<DocumentOut[]>("/documents", { params: { page, page_size: pageSize } })
-    .then((r) => r.data);
+export const getDocuments = (page = 1, pageSize = 20): Promise<DocumentOut[]> =>
+  api.get<DocumentOut[]>("/documents", { params: { page, page_size: pageSize } }).then((r) => r.data);
 
 export const getDocumentStats = (): Promise<DocumentStats> =>
   api.get<DocumentStats>("/documents/stats").then((r) => r.data);
@@ -48,8 +49,7 @@ export const getHealth = (): Promise<HealthResponse> =>
 export const uploadResearchPaper = (file: File): Promise<ResearchUploadResponse> => {
   const formData = new FormData();
   formData.append("file", file);
-  return api
-    .post<ResearchUploadResponse>("/research/upload", formData, {
+  return api.post<ResearchUploadResponse>("/research/upload", formData, {
       headers: { "Content-Type": "multipart/form-data" },
       timeout: 180_000,
     })
@@ -59,10 +59,48 @@ export const uploadResearchPaper = (file: File): Promise<ResearchUploadResponse>
 export const getResearchPapers = (): Promise<ResearchPaper[]> =>
   api.get<ResearchPaper[]>("/research/papers").then((r) => r.data);
 
-export const queryResearchPaper = (
-  payload: ResearchQueryRequest
-): Promise<ResearchQueryResponse> =>
+export const queryResearchPaper = (payload: ResearchQueryRequest): Promise<ResearchQueryResponse> =>
   api.post<ResearchQueryResponse>("/research/query", payload).then((r) => r.data);
 
 export const deleteResearchPaper = (paperId: string): Promise<{ status: string }> =>
   api.delete<{ status: string }>(`/research/papers/${paperId}`).then((r) => r.data);
+
+export const getSources = (): Promise<SourcesResponse> =>
+  api.get<SourcesResponse>("/sources").then((r) => r.data);
+
+export const getMetrics = (): Promise<RetrievalMetrics> =>
+  api.get<RetrievalMetrics>("/metrics").then((r) => r.data);
+
+export const resetMetrics = (): Promise<RetrievalMetrics> =>
+  api.post<RetrievalMetrics>("/metrics/reset").then((r) => r.data);
+
+export const runRecallBenchmark = (numSamples = 15): Promise<{ status: string; evaluated_queries: number; hits: number; metrics: RetrievalMetrics }> =>
+  api.post("/metrics/benchmark", null, { params: { num_samples: numSamples } }).then((r) => r.data);
+
+export const getVectorStats = (): Promise<VectorStats> =>
+  api.get<VectorStats>("/maintenance/vector-stats").then((r) => r.data);
+
+export const separateRecentData = (): Promise<SeparationResult> =>
+  api.post<SeparationResult>("/maintenance/separate-recent", null, { timeout: 300_000 }).then((r) => r.data);
+
+export const getLatestSummary = (): Promise<NewsSummary | null> =>
+  api.get<NewsSummary | null>("/summary").then((r) => r.data);
+
+export const generateSummary = (): Promise<NewsSummary> =>
+  api.post<NewsSummary>("/summary", null, { timeout: 300_000 }).then((r) => r.data);
+
+export const getSummaryPreferences = (): Promise<UserPreferences> =>
+  api.get<UserPreferences>("/summary/preferences").then((r) => r.data);
+
+export const updateSummaryPreferences = (payload: UserPreferences): Promise<UserPreferences> =>
+  api.post<UserPreferences>("/summary/preferences", payload).then((r) => r.data);
+
+export const syncUser = (payload: {
+  id: string;
+  email?: string;
+  name?: string;
+  first_name?: string;
+  last_name?: string;
+  image_url?: string;
+}): Promise<any> =>
+  api.post("/users/sync", payload).then((r) => r.data);

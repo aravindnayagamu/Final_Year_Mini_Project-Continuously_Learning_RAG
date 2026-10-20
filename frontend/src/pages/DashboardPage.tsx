@@ -54,7 +54,6 @@ export default function DashboardPage() {
       <TopBar
         title="Dashboard"
         subtitle="Pipeline overview and document inventory"
-        badge={new Date().toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" })}
         actions={
           <button
             className="btn btn-ghost btn-sm"
